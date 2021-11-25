@@ -1,6 +1,6 @@
 # Tiny—Type—Rules
 
-Tiny—Type—Rules is an open
+Tiny rules is an open source project designed to correct and enforce all micro-typographic rules related to the selected language.
 
 
 ## Rules
