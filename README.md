@@ -2,6 +2,7 @@
 
 Tiny rules is an open source project designed to correct and enforce all micro-typographic rules related to the selected language.
 
+<span style="color:blue">some *blue* text</span>.
 
 ## Rules
 ### [FR] — French
