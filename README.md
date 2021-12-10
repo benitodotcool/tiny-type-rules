@@ -38,42 +38,22 @@ Tiny rules is an open source project designed to correct and enforce all micro-t
       …
     </div>
     ```
-3. Exemple d'arborencense de dossier:
+3. Exemple d'arborencense du dossier:
     ```
-    project
+    tiny-type-rules
     │   README.md
-    │   file001.txt    
-    │
-    └───folder1
-    │   │   file011.txt
-    │   │   file012.txt
-    │   │
-    │   └───subfolder1
-    │       │   file111.txt
-    │       │   file112.txt
+    │   LICENSE
+    |
+    └───language
+    |   |
+    │   └───french
+    │   |   │   french.json
+    |   |
+    │   └───english
+    │       │   english.json
     │   
-    └───folder2
-        │   file021.txt
-        │   file022.txt
-    ```
-    ```
-    +-- _config.yml
-    +-- _drafts
-    |   +-- begin-with-the-crazy-ideas.textile
-    |   +-- on-simplicity-in-technology.markdown
-    +-- _includes
-    |   +-- footer.html
-    |   +-- header.html
-    +-- _layouts
-    |   +-- default.html
-    |   +-- post.html
-    +-- _posts
-    |   +-- 2007-10-29-why-every-programmer-should-play-nethack.textile
-    |   +-- 2009-04-26-barcamp-boston-4-roundup.textile
-    +-- _data
-    |   +-- members.yml
-    +-- _site
-    +-- index.html
+    └───config
+        │   algorithm.js
     ```
 4. Exemple `french.js`:
     ``` javascript 
@@ -81,15 +61,15 @@ Tiny rules is an open source project designed to correct and enforce all micro-t
       ",": {
         "before": 0,
         "after": 1
-      }
+      },
       ".": {
         "before": 0,
         "after": 1
-      }
+      },
       ":": {
         "before": 0.5,
         "after": 1
       }
     }
     ```
-5. Avoir un fichier par langue qui gère les erreurs de frappe (ex: `...` &#8594; `…`).
+5. Avoir un fichier par langue qui gère les erreurs de frappe. (ex: `...` &#8594; `…`).
