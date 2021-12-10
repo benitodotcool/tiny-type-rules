@@ -96,7 +96,7 @@ Tiny rules is an open source project designed to correct and enforce all micro-t
     ``` javascript 
     const narrowItems = document.querySelectorAll('.narrowNoBreakSpace');
     narrowItems.map((item) => {
-      const itemFontSize = item.getFontSize; //Ligne incorrecte
+      const itemFontSize = item.getFontSize(); //Ligne incorrecte
       item.style.fontSize = itemFontSize / 2;
     });
     ```
