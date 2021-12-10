@@ -1,7 +1,7 @@
 # tiny type rules
 
 Tiny rules is an open source project designed to correct and enforce all micro-typographic rules related to the selected language.
-
+<!-- 
 ## Rules
 ### [FR] — French
 
@@ -19,7 +19,7 @@ Tiny rules is an open source project designed to correct and enforce all micro-t
 12. `(` &#8594; `Before: classic space` `After: nothing`
 13. `)` &#8594; `Before: nothing` `After: classic space`
 14. `[` &#8594; `Before: classic space` `After: nothing`
-15. `]` &#8594; `Before: nothing` `After: classic space`
+15. `]` &#8594; `Before: nothing` `After: classic space` -->
 
 ### Concept by
 [@benitodotcool](https://www.instagram.com/benitodotcool/) | [benito.cool](https://benito.cool/)
