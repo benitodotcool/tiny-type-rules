@@ -27,6 +27,11 @@ Tiny rules is an open source project designed to correct and enforce all micro-t
 ----
 
 1. Englober dans une balise globale toute l'application.
+    ``` html
+    <div class="wrapper__application" dataLanguageFR>
+      …
+    </div>
+    ```
 2. Passer en props la langue.
 3. Pouvoir décider de ne pas appliquer la/les règles sur certaines balises.
 4. Avoir un dossier `language`.
@@ -46,7 +51,6 @@ Tiny rules is an open source project designed to correct and enforce all micro-t
         "before": 0.5,
         "after": 1
       }
-      `etc.`
     }
     ```
-7. Suite
+7. Avoir un fichier par langue qui gère les erreurs de frappe (ex: `...` &#8594; `…`).
