@@ -92,3 +92,11 @@ Tiny rules is an open source project designed to correct and enforce all micro-t
       0.5: "<span class="narrowNoBreakSpace">&nbsp;</span>"
     }
     ```
+7. Appliquer un style `font-size` custom à tous les éléments qui ont la classe `narrowNoBreakSpace`:
+    ``` javascript 
+    const narrowItems = document.querySelectorAll('.narrowNoBreakSpace');
+    narrowItems.map((item) => {
+      const itemFontSize = item.getFontSize; //Ligne incorrecte
+      item.style.fontSize = itemFontSize / 2;
+    });
+    ```
