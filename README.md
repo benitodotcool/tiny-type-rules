@@ -33,9 +33,31 @@ Tiny rules is an open source project designed to correct and enforce all micro-t
     </div>
     ```
 2. Pouvoir décider de ne pas appliquer la/les règles sur certaines balises.
-3. Avoir un dossier `language`.
-4. Avoir un fichier `langue.js` pour chaque langue (ex: `french.js`) dans `language`.
-5. Exemple `french.js`:
+    ``` html
+    <div class="container__quote" data-language-null>
+      …
+    </div>
+    ```
+3. Exemple d'arborencense de dossier:
+    ```
+    project
+    │   README.md
+    │   file001.txt    
+    │
+    └───folder1
+    │   │   file011.txt
+    │   │   file012.txt
+    │   │
+    │   └───subfolder1
+    │       │   file111.txt
+    │       │   file112.txt
+    │       │   ...
+    │   
+    └───folder2
+        │   file021.txt
+        │   file022.txt
+    ```
+4. Exemple `french.js`:
     ``` javascript 
     {
       ",": {
@@ -52,4 +74,4 @@ Tiny rules is an open source project designed to correct and enforce all micro-t
       }
     }
     ```
-6. Avoir un fichier par langue qui gère les erreurs de frappe (ex: `...` &#8594; `…`).
+5. Avoir un fichier par langue qui gère les erreurs de frappe (ex: `...` &#8594; `…`).
