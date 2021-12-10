@@ -1,4 +1,4 @@
-# Tiny—Type—Rules
+# tiny type rules
 
 Tiny rules is an open source project designed to correct and enforce all micro-typographic rules related to the selected language.
 
@@ -21,8 +21,22 @@ Tiny rules is an open source project designed to correct and enforce all micro-t
 14. `[` &#8594; `Before: classic space` `After: nothing`
 15. `]` &#8594; `Before: nothing` `After: classic space`
 
-### Cool concept by
+### Concept by
 [@benitodotcool](https://www.instagram.com/benitodotcool/) | [benito.cool](https://benito.cool/)
 
 ----
 
+1. Englober dans une balise globale toute l'application
+2. Passer en props la langue
+3. Pouvoir décider de ne pas appliquer la/les règles sur certaines balises
+4. Avoir un dossier `language`
+5. Avoir un fichier `langue.js` pour chaque langue (ex: `french.js`) dans `language`
+  `exemple:`
+  ``` javascript 
+  {
+    ",": {
+      "before": 0,
+      "after": 1
+    }
+  }
+  ```
