@@ -26,17 +26,18 @@ Tiny rules is an open source project designed to correct and enforce all micro-t
 
 ----
 
-1. Englober dans une balise globale toute l'application.
+1. Englober dans une balise globale toute l'application et passer en props la langue.
+
     ``` html
-    <div class="wrapper__application" dataLanguageFR>
+    <div class="wrapper__application" data-language-FR>
       …
     </div>
     ```
-2. Passer en props la langue.
-3. Pouvoir décider de ne pas appliquer la/les règles sur certaines balises.
-4. Avoir un dossier `language`.
-5. Avoir un fichier `langue.js` pour chaque langue (ex: `french.js`) dans `language`.
-6. Exemple `french.js`:
+2. Pouvoir décider de ne pas appliquer la/les règles sur certaines balises.
+3. Avoir un dossier `language`.
+4. Avoir un fichier `langue.js` pour chaque langue (ex: `french.js`) dans `language`.
+5. Exemple `french.js`:
+
     ``` javascript 
     {
       ",": {
@@ -53,4 +54,4 @@ Tiny rules is an open source project designed to correct and enforce all micro-t
       }
     }
     ```
-7. Avoir un fichier par langue qui gère les erreurs de frappe (ex: `...` &#8594; `…`).
+6. Avoir un fichier par langue qui gère les erreurs de frappe (ex: `...` &#8594; `…`).
