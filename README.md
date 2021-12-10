@@ -69,14 +69,26 @@ Tiny rules is an open source project designed to correct and enforce all micro-t
       ":": {
         "before": 0.5,
         "after": 1
+      },
+      "«": {
+        "before": 1,
+        "after": 0.5,
       }
     }
     ```
-5. Avoir un fichier par langue qui gère les erreurs de frappe:
+5. Avoir un fichier par langue qui gère les erreurs de frappe (à executer en premier):
     ``` javascript 
     {
       "...": "…",
       "“": "«",
       "”": "»"
+    }
+    ```
+6. Avoir un fichier `config/spacing.js` qui définie chaque espace lié au valeur de `french.js`:
+    ``` javascript 
+    {
+      0: "",
+      1: " ",
+      0.5: "<span class="narrowNoBreakSpace">&nbsp;</span>"
     }
     ```
