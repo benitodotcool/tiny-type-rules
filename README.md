@@ -21,5 +21,8 @@ Tiny rules is an open source project designed to correct and enforce all micro-t
 14. `[` &#8594; `Before: classic space` `After: nothing`
 15. `]` &#8594; `Before: nothing` `After: classic space`
 
--------------
+### Cool concept by
 [@benitodotcool](https://www.instagram.com/benitodotcool/) | [benito.cool](https://benito.cool/)
+
+----
+
