@@ -104,3 +104,35 @@ test('rehype plugin takes serializable settings', () => {
   rehypeTinyTypeRules({ locale: 'fr', locales: { fr: { spaceBefore: { '!': '' } } } })(tree)
   assert.equal(tree.children[0].children[0].value, 'Oui!')
 })
+
+test('a default locale applies when a call gives none', () => {
+  const typo = createTypo({ locale: 'fr' })
+  assert.equal(typo.text('Oui !'), nb('Oui^!'))
+  assert.equal(typo.text('Yes !', 'en'), 'Yes!')
+  assert.equal(typo.html('<p>Oui !</p>'), nb('<p>Oui^!</p>'))
+  assert.equal(typo.html('<p lang="en">Yes !</p>'), '<p lang="en">Yes!</p>')
+})
+
+test('watch fixes the DOM, then every change, and stops', async () => {
+  const { Window } = await import('happy-dom')
+  const window = new Window()
+  globalThis.MutationObserver = window.MutationObserver
+  const { document } = window
+  document.body.innerHTML = '<main lang="fr"><p>Bonjour <em>à tous</em> !</p></main>'
+  const main = document.querySelector('main')
+  const stop = createTypo().watch(main)
+  const show = () => main.innerHTML.replaceAll(' ', '~').replaceAll(' ', '^')
+  assert.equal(show(), '<p>Bonjour <em>à tous</em>^!</p>')
+
+  main.querySelector('em').textContent = 'vous'
+  main.insertAdjacentHTML('beforeend', '<p>Vraiment ?</p>')
+  await new Promise((resolve) => setTimeout(resolve, 0))
+  assert.equal(show(), '<p>Bonjour <em>vous</em>^!</p><p>Vraiment^?</p>')
+
+  stop()
+  main.insertAdjacentHTML('beforeend', '<p>Fini ?</p>')
+  await new Promise((resolve) => setTimeout(resolve, 0))
+  assert.ok(show().endsWith('<p>Fini ?</p>'))
+  delete globalThis.MutationObserver
+  await window.happyDOM.close()
+})

@@ -85,6 +85,7 @@ export interface DomNode {
   readonly childNodes: ArrayLike<DomNode>
   readonly parentElement: DomNode | null
   readonly localName?: string
+  readonly isConnected?: boolean
   getAttribute?(name: string): string | null
 }
 
@@ -103,6 +104,35 @@ export function fixDomWith(fix: FixParts, root: DomNode | null | undefined, loca
   for (let n = root.parentElement; n; n = n.parentElement) chain.unshift(n)
   const scope = chain.reduce((s, el) => enter(dom.tag(el), (name) => dom.attr(el, name), s) ?? s, base(locale))
   fixTree(dom, fix, { nodeType: 11, nodeValue: null, childNodes: [root], parentElement: null }, scope)
+}
+
+type Observer = { observe(root: DomNode, options: object): void; disconnect(): void }
+type Mutation = { target: DomNode }
+
+/** Fixes `root`, then the block around every text change, batched once per microtask. */
+export function watchDomWith(fix: FixParts, root: DomNode | null | undefined, locale?: string): () => void {
+  const MutationObserver = (globalThis as { MutationObserver?: new (cb: (m: Mutation[]) => void) => Observer })
+    .MutationObserver
+  if (!root || !MutationObserver) return () => {}
+  fixDomWith(fix, root, locale)
+  let pending = new Set<DomNode>()
+  const observer = new MutationObserver((mutations) => {
+    if (!pending.size) void Promise.resolve().then(flush)
+    for (const { target } of mutations) {
+      let block: DomNode | null = target.nodeType === 1 ? target : target.parentElement
+      // The run a change belongs to starts at the nearest non-inline ancestor.
+      while (block && block !== root && INLINE.has(block.localName ?? '')) block = block.parentElement
+      if (block) pending.add(block)
+    }
+  })
+  const flush = () => {
+    const blocks = pending
+    pending = new Set()
+    // Writing back fixed text triggers one more, idempotent pass that changes nothing.
+    for (const block of blocks) if (block.isConnected !== false) fixDomWith(fix, block, locale)
+  }
+  observer.observe(root, { childList: true, characterData: true, subtree: true })
+  return () => observer.disconnect()
 }
 
 /** The subset of a hast (rehype) or MDX node this library reads. */

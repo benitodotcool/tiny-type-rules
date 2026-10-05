@@ -1,7 +1,7 @@
 import { compile, Run, type LocaleConfig } from './engine.ts'
 import { fixHtmlWith } from './html.ts'
 import { OPAQUE, type FixParts } from './scope.ts'
-import { fixDomWith, fixHastWith, type DomNode, type HastNode } from './tree.ts'
+import { fixDomWith, fixHastWith, watchDomWith, type DomNode, type HastNode } from './tree.ts'
 import { en } from './locales/en.ts'
 import { fr } from './locales/fr.ts'
 
@@ -10,6 +10,8 @@ export type { DomNode, HastNode, LocaleConfig }
 export { en, fr }
 
 export interface TypoOptions {
+  /** Language used when a call gives none. */
+  locale?: string
   /**
    * Settings per BCP 47 tag, merged over the built-in config of the tag or of its language
    * (`fr-CH` starts from `fr`). An unknown tag adds a language.
@@ -19,12 +21,12 @@ export interface TypoOptions {
 
 export interface Typo {
   /** Fixes a plain string. An unsupported locale returns it unchanged. */
-  text(text: string, locale: string): string
+  text(text: string, locale?: string): string
   /**
    * Fixes text split into pieces (rich text spans, Portable Text children) as one string,
    * so rules see across piece boundaries. Returns as many pieces as it was given.
    */
-  parts(parts: readonly string[], locale: string): string[]
+  parts(parts: readonly string[], locale?: string): string[]
   /**
    * Fixes the text of an HTML string, leaving markup, code and attributes untouched.
    * `data-ttr-lang`, then the nearest `lang` attribute, win over `locale`.
@@ -34,7 +36,7 @@ export interface Typo {
    * Fixes Portable Text blocks (Sanity), span text only. Returns new blocks, leaves the input alone.
    * Spans marked `code` and blocks of any other `_type` are left untouched.
    */
-  portableText<T>(blocks: readonly T[], locale: string): T[]
+  portableText<T>(blocks: readonly T[], locale?: string): T[]
   /**
    * Fixes the text nodes of a live DOM element in place, browser side. Ancestors count:
    * their `lang` and `data-*` attributes apply as in `html`.
@@ -42,6 +44,11 @@ export interface Typo {
   element(root: DomNode | null | undefined, locale?: string): void
   /** Fixes a hast tree (rehype, MDX) in place, with the same rules as `html`. */
   hast(tree: HastNode, locale?: string): void
+  /**
+   * Fixes a live DOM element, then again whenever its text changes, browser side.
+   * Returns a function that stops watching.
+   */
+  watch(root: DomNode | null | undefined, locale?: string): () => void
 }
 
 interface Span {
@@ -84,7 +91,7 @@ export function createTypo(options: TypoOptions = {}): Typo {
 
   const compiled = new Map([...configs].map(([tag, config]) => [tag, compile(config)]))
 
-  const fix: FixParts = (parts, locale, before = '', after = '') => {
+  const fix: FixParts = (parts, locale = options.locale, before = '', after = '') => {
     const apply = typeof locale === 'string' ? lookup(compiled, normalize(locale)) : undefined
     if (!apply) return undefined
     const all = [before, ...parts, after]
@@ -103,7 +110,7 @@ export function createTypo(options: TypoOptions = {}): Typo {
       const fixed = fix(parts.map((p) => (typeof p === 'string' ? p : OPAQUE)), locale)
       return parts.map((p, i) => (typeof p === 'string' && fixed ? fixed[i]! : p))
     },
-    html: (html, locale) => (typeof html === 'string' ? fixHtmlWith(fix, html, locale) : html),
+    html: (html, locale = options.locale) => (typeof html === 'string' ? fixHtmlWith(fix, html, locale) : html),
     portableText: (blocks, locale) =>
       !Array.isArray(blocks)
         ? (blocks as never)
@@ -122,8 +129,9 @@ export function createTypo(options: TypoOptions = {}): Typo {
               children: children.map((c: Span, i) => (isText(c) && c.text !== fixed[i] ? { ...c, text: fixed[i] } : c)),
             }
           }),
-    element: (root, locale) => fixDomWith(fix, root, locale),
-    hast: (tree, locale) => fixHastWith(fix, tree, locale),
+    element: (root, locale = options.locale) => fixDomWith(fix, root, locale),
+    hast: (tree, locale = options.locale) => fixHastWith(fix, tree, locale),
+    watch: (root, locale = options.locale) => watchDomWith(fix, root, locale),
   }
 }
 
@@ -139,6 +147,8 @@ export const fixHtml = typo.html
 export const fixPortableText = typo.portableText
 /** Fixes a live DOM element in place with the built-in settings. */
 export const fixElement = typo.element
+/** Fixes a live DOM element now and on every change, with the built-in settings. Returns a stop function. */
+export const watchElement = typo.watch
 
 /**
  * rehype plugin: `unified().use(rehypeTinyTypeRules, { locale: 'fr' })`.

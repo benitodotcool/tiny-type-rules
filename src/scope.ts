@@ -13,7 +13,12 @@ export const OPAQUE = '￼'
 export type Scope = { name: string; depth: number; skip: boolean; locale: string | undefined }
 
 /** Fixes pieces of one text; `before` and `after` are read-only context. Undefined: unsupported locale. */
-export type FixParts = (parts: readonly string[], locale: string, before?: string, after?: string) => string[] | undefined
+export type FixParts = (
+  parts: readonly string[],
+  locale: string | undefined,
+  before?: string,
+  after?: string,
+) => string[] | undefined
 
 /** The scope an element opens, or undefined when it shares its parent's. */
 export function enter(name: string, attr: (name: string) => string | null, top: Scope): Scope | undefined {
