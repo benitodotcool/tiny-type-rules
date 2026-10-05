@@ -3,7 +3,7 @@ import { test } from 'node:test'
 
 import { createTypo, fixElement, fixPortableText, rehypeTinyTypeRules } from '../src/index.ts'
 
-const nb = (s) => s.replaceAll('~', ' ').replaceAll('^', ' ')
+const nb = (s) => s.replaceAll('~', '\u00A0').replaceAll('^', '\u202F')
 
 test('Portable Text: spans fixed as one run, code spans and other blocks untouched', () => {
   const blocks = [

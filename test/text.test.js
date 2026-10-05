@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
-import { fixParts, fixText } from '../src/index.ts'
+import { createTypo, fixParts, fixText, NBSP, NNBSP } from '../src/index.ts'
 
 // `~` stands for U+00A0 (no-break space), `^` for U+202F (narrow no-break space).
-const nb = (s) => s.replaceAll('~', ' ').replaceAll('^', ' ')
+const nb = (s) => s.replaceAll('~', '\u00A0').replaceAll('^', '\u202F')
 
 const cases = {
   fr: [
@@ -14,7 +14,7 @@ const cases = {
     ['Vraiment ; oui', 'Vraiment^; oui'],
     ['Note : ceci', 'Note~: ceci'],
     ['Note:', 'Note~:'],
-    ['Bonjour !', 'Bonjour^!'],
+    ['Bonjour\u00A0!', 'Bonjour^!'],
     ['Bonjour   ?', 'Bonjour^?'],
     ['« Bonjour »', '«~Bonjour~»'],
     ['«Bonjour»', '«~Bonjour~»'],
@@ -24,17 +24,8 @@ const cases = {
     ["L'apostrophe d'aujourd'hui", 'L’apostrophe d’aujourd’hui'],
     ['Et puis...', 'Et puis…'],
     ['Quoi...?', 'Quoi…^?'],
-    ['3 000 personnes', '3^000 personnes'],
-    ['1 000 000 €', '1^000^000~€'],
-    ['en 2023 300 personnes', 'en 2023 300 personnes'],
-    ['50 %', '50~%'],
-    ['10 kg et 5 min', '10~kg et 5~min'],
-    ['20 °C', '20~°C'],
-    ['5 maisons', '5 maisons'],
+    ['3 000 kg, M. Dupont', '3 000 kg, M. Dupont'],
     ['Oui , non', 'Oui, non'],
-    ['M. Dupont et Mme Durand', 'M.~Dupont et Mme~Durand'],
-    ['le n° 5', 'le n°~5'],
-    ['Dommage. Me voilà', 'Dommage. Me~voilà'],
     ['un tiret - ici', 'un tiret - ici'],
   ],
   en: [
@@ -47,10 +38,8 @@ const cases = {
     ['Wait ; what ?', 'Wait; what?'],
     ['Note : this', 'Note: this'],
     ['Well...', 'Well…'],
-    ['50 %', '50~%'],
+    ['50 %, Mr. Smith', '50 %, Mr. Smith'],
     ['Four.... dots', 'Four.... dots'],
-    ['Mr. Smith, see p. 12', 'Mr.~Smith, see p.~12'],
-    ['group. Then', 'group. Then'],
   ],
 }
 
@@ -98,4 +87,39 @@ test('fixParts applies rules across parts and keeps their count', () => {
   assert.deepEqual(fixParts(['a', '', 'b'], 'fr'), ['a', '', 'b'])
   assert.deepEqual(fixParts([], 'fr'), [])
   assert.deepEqual(fixParts(['Hallo', ' !'], 'de'), ['Hallo', ' !'])
+})
+
+test('opt-in number, unit and abbreviation spaces', () => {
+  const typo = createTypo({
+    locales: {
+      fr: { thousandsSeparator: NNBSP, unitSpace: NBSP, abbreviationSpace: NBSP },
+      en: { unitSpace: NBSP, abbreviationSpace: NBSP },
+    },
+  })
+  const cases = {
+    fr: [
+      ['3 000 personnes', '3^000 personnes'],
+      ['1 000 000 €', '1^000^000~€'],
+      ['en 2023 300 personnes', 'en 2023 300 personnes'],
+      ['50 %', '50~%'],
+      ['10 kg et 5 min', '10~kg et 5~min'],
+      ['20 °C', '20~°C'],
+      ['5 maisons', '5 maisons'],
+      ["En 2023 s'est tenu", 'En 2023 s’est tenu'],
+      ['M. Dupont et Mme Durand', 'M.~Dupont et Mme~Durand'],
+      ['le n° 5', 'le n°~5'],
+    ],
+    en: [
+      ['50 %', '50~%'],
+      ['Mr. Smith, see p. 12', 'Mr.~Smith, see p.~12'],
+      ['group. Then', 'group. Then'],
+    ],
+  }
+  for (const [locale, list] of Object.entries(cases)) {
+    for (const [input, expected] of list) {
+      const once = typo.text(input, locale)
+      assert.equal(once, nb(expected), input)
+      assert.equal(typo.text(once, locale), once, input)
+    }
+  }
 })

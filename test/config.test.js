@@ -3,7 +3,7 @@ import { test } from 'node:test'
 
 import { createTypo, fr, NNBSP, THIN_SPACE } from '../src/index.ts'
 
-const nb = (s) => s.replaceAll('~', ' ').replaceAll('^', ' ')
+const nb = (s) => s.replaceAll('~', '\u00A0').replaceAll('^', '\u202F')
 
 test('overrides one setting and keeps the others', () => {
   const typo = createTypo({ locales: { fr: { spaceBefore: { '!': THIN_SPACE } } } })
@@ -69,20 +69,20 @@ test('opt-in settings: widows', () => {
 })
 
 test('arrays replace, maps merge', () => {
-  const typo = createTypo({ locales: { fr: { units: ['pc'], replacements: { '(r)': '®' } } } })
+  const typo = createTypo({ locales: { fr: { unitSpace: '\u00A0', units: ['pc'], replacements: { '(r)': '®' } } } })
   assert.equal(typo.text('5 pc, 5 kg', 'fr'), nb('5~pc, 5 kg'))
 })
 
 test('non-breaking spaces of every width survive widows and a second pass', () => {
-  const typo = createTypo({ locales: { fr: { spaceBefore: { '!': ' ' }, widowSpace: ' ' } } })
+  const typo = createTypo({ locales: { fr: { spaceBefore: { '!': '\u2007' }, widowSpace: '\u00A0' } } })
   const once = typo.text('Il finit par un cri !', 'fr')
-  assert.equal(once, nb('Il finit par un~cri !'))
+  assert.equal(once, nb('Il finit par un~cri\u2007!'))
   assert.equal(typo.text(once, 'fr'), once)
 })
 
 test('setting values are literal strings', () => {
   const typo = createTypo({ locales: { fr: { replacements: { USD: '$1 $&' }, spaceBefore: { '!': '$1' } } } })
-  assert.equal(typo.text('10 USD !', 'fr'), nb('10 $1~$&$1!'))
+  assert.equal(typo.text('10 USD !', 'fr'), '10 $1 $&$1!')
 })
 
 test('missing inputs come back as they are', async () => {

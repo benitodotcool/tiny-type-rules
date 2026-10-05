@@ -3,7 +3,7 @@ import { test } from 'node:test'
 
 import { createTypo, fixHtml, fixParts, fixPortableText, fixText, rehypeTinyTypeRules } from '../src/index.ts'
 
-const nb = (s) => s.replaceAll('~', ' ').replaceAll('^', ' ')
+const nb = (s) => s.replaceAll('~', '\u00A0').replaceAll('^', '\u202F')
 
 test('entities never decode into markup', () => {
   for (const html of [
@@ -98,7 +98,7 @@ test('attribute values are not read as attributes', () => {
 })
 
 test('idempotent with widows and rule order', () => {
-  const typo = createTypo({ locales: { fr: { widowSpace: ' ' }, en: { widowSpace: ' ' } } })
+  const typo = createTypo({ locales: { fr: { widowSpace: '\u00A0' }, en: { widowSpace: '\u00A0' } } })
   for (const [text, locale] of [
     ['Une phrase qui finit ...', 'fr'],
     ['A sentence that ends ...', 'en'],
@@ -161,7 +161,8 @@ test('nested lists and other implied end tags', () => {
 
 test('letter entities are real letters to the rules', () => {
   assert.equal(fixHtml("<p>The caf&eacute;'s menu</p>", 'en'), '<p>The café’s menu</p>')
-  assert.equal(fixHtml('<p>50 &euro; et M. &Eacute;mile</p>', 'fr'), nb('<p>50~€ et M.~Émile</p>'))
+  const units = createTypo({ locales: { fr: { unitSpace: '\u00A0', abbreviationSpace: '\u00A0' } } })
+  assert.equal(units.html('<p>50 &euro; et M. &Eacute;mile</p>', 'fr'), nb('<p>50~€ et M.~Émile</p>'))
   assert.equal(fixHtml('<p>a &lt; b !</p>', 'fr'), nb('<p>a &lt; b^!</p>'))
   assert.equal(fixHtml('<p>Tom &amp; Jerry !</p>', 'fr'), nb('<p>Tom &amp; Jerry^!</p>'))
 })
@@ -210,7 +211,7 @@ test('Portable Text keeps unchanged blocks and spans as they are', () => {
 })
 
 test('no quadratic cliff on many scopes or long widow tails', () => {
-  const typo = createTypo({ locales: { fr: { widowSpace: ' ' } } })
+  const typo = createTypo({ locales: { fr: { widowSpace: '\u00A0' } } })
   for (const run of [
     () => fixHtml('<span lang="fr"></span>'.repeat(8000), 'fr'),
     () => typo.text('a' + ' !'.repeat(8000), 'fr'),
@@ -224,6 +225,6 @@ test('no quadratic cliff on many scopes or long widow tails', () => {
 
 test('thousands stay linear on huge numbers', () => {
   const start = performance.now()
-  fixText('1' + ' 000'.repeat(20000), 'fr')
+  createTypo({ locales: { fr: { thousandsSeparator: '\u202F' } } }).text('1' + ' 000'.repeat(20000), 'fr')
   assert.ok(performance.now() - start < 100)
 })

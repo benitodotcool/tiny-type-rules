@@ -3,7 +3,7 @@ import { test } from 'node:test'
 
 import { fixHtml } from '../src/index.ts'
 
-const nb = (s) => s.replaceAll('~', ' ').replaceAll('^', ' ')
+const nb = (s) => s.replaceAll('~', '\u00A0').replaceAll('^', '\u202F')
 const fr = (html) => fixHtml(html, 'fr')
 
 test('fixes text, never markup', () => {

@@ -4,7 +4,7 @@
 [![CI](https://github.com/benitodotcool/tiny-type-rules/actions/workflows/ci.yml/badge.svg)](https://github.com/benitodotcool/tiny-type-rules/actions/workflows/ci.yml)
 [![license](https://img.shields.io/npm/l/tiny-type-rules)](LICENSE)
 
-Micro-typography for the web, in French and English: non-breaking spaces before `; : ! ?`, curly quotes and apostrophes, `« guillemets »`, thousands separators, numbers kept with their units, ellipses.
+Micro-typography for the web, in French and English: non-breaking spaces before `; : ! ?`, curly quotes and apostrophes, `« guillemets »`, ellipses.
 
 ```js
 import { fixText } from 'tiny-type-rules'
@@ -53,9 +53,6 @@ In the tables, `·` stands for a no-break space (U+00A0) and `⋅` for a narrow 
 | Nested quotes           | `« Il a dit "oui" »`    | `«·Il a dit “oui”·»`      |
 | Apostrophe              | `l'été`                 | `l’été`                   |
 | Ellipsis                | `Et puis...`            | `Et puis…`                |
-| Thousands               | `10 000`                | `10⋅000`                  |
-| Number and unit         | `50 %`, `3 kg`          | `50·%`, `3·kg`            |
-| Abbreviations           | `M. Dupont`, `n° 5`     | `M.·Dupont`, `n°·5`       |
 
 ### English (`en`)
 
@@ -66,10 +63,21 @@ In the tables, `·` stands for a no-break space (U+00A0) and `⋅` for a narrow 
 | Apostrophes             | `it's`, `the '90s`      | `it’s`, `the ’90s`        |
 | No space before `;:!?,` | `Wait ; what ?`         | `Wait; what?`             |
 | Ellipsis                | `Well...`               | `Well…`                   |
-| Number and unit         | `50 %`, `3 kg`          | `50·%`, `3·kg`            |
-| Abbreviations           | `Mr. Smith`, `p. 12`    | `Mr.·Smith`, `p.·12`      |
 
-Off by default, one setting away: dashes, last-word widows, free replacements such as `(c)` to `©`. See [Settings](#settings).
+### Off by default
+
+One setting away (see [Settings](#settings)). The space rules below never change a visible character: they swap a space you typed for a no-break one, so the line never wraps there.
+
+| Rule              | Setting              | Before                         | After                            |
+| ----------------- | -------------------- | ------------------------------ | -------------------------------- |
+| Thousands         | `thousandsSeparator` | `10 000`                       | `10⋅000`                         |
+| Number and unit   | `unitSpace`          | `50 %`, `3 kg`                 | `50·%`, `3·kg`                   |
+| Abbreviations     | `abbreviationSpace`  | `M. Dupont`, `n° 5`, `p. 12`   | `M.·Dupont`, `n°·5`, `p.·12`     |
+| Dashes            | `dash`               | `a - b`                        | `a – b`                          |
+| Last-word widows  | `widowSpace`         | `the last word`                | `the last·word`                  |
+| Free replacements | `replacements`       | `(c)`                          | `©`                              |
+
+Units and abbreviations come from a list, and a short entry can match a word that only looks like one (`Groupe 2 A`, `Me voilà`): the text still reads the same, but the line can no longer wrap there.
 
 The French rules follow the _Lexique des règles typographiques en usage à l'Imprimerie nationale_: narrow no-break space before `; ! ?`, no-break space before `:` and inside guillemets.
 
@@ -82,7 +90,7 @@ Locales are matched on their language: `fr-FR`, `fr-CA` and `fr_BE` all get the 
 ```js
 import { fixText } from 'tiny-type-rules'
 
-fixText('Bonjour !', 'fr') // 'Bonjour !'
+fixText('Bonjour !', 'fr') // 'Bonjour\u202F!'
 ```
 
 ### HTML
@@ -149,7 +157,7 @@ Rewrites text nodes in place, never adds or removes a node. The `lang` and `data
 
 ## HTML attributes
 
-Like `data-lenis-prevent` for Lenis, a few attributes scope the rules from your markup. They work in `fixHtml`, `fixElement` and the rehype plugin.
+A few attributes scope the rules from your markup. They work in `fixHtml`, `fixElement` and the rehype plugin.
 
 | Attribute              | Effect                                                                     |
 | ---------------------- | -------------------------------------------------------------------------- |
@@ -184,12 +192,12 @@ console.log(fr)
 //   singleQuotes: false,
 //   apostrophe: '’',
 //   ellipsis: '…',
-//   spaceInsideQuotes: ' ',
-//   spaceBefore: { ',': '', ';': ' ', '!': ' ', '?': ' ', ':': ' ' },
-//   thousandsSeparator: ' ',
-//   unitSpace: ' ',
+//   spaceInsideQuotes: '\u00A0',
+//   spaceBefore: { ',': '', ';': '\u202F', '!': '\u202F', '?': '\u202F', ':': '\u00A0' },
+//   thousandsSeparator: false,
+//   unitSpace: false,
 //   units: ['%', '€', 'kg', ...],
-//   abbreviationSpace: ' ',
+//   abbreviationSpace: false,
 //   abbreviations: ['M.', 'Mme', 'n°', ...],
 //   dash: false,
 //   widowSpace: false,
@@ -226,10 +234,10 @@ Every value follows the same convention: **a string** replaces (inserting the sp
 | `ellipsis`           | string                       | `…`               | `…`               | Three dots.                                                                      |
 | `spaceInsideQuotes`  | string                       | U+00A0            | `false`           | Right inside the outer quotes.                                                   |
 | `spaceBefore`        | `{ [mark]: string }`         | see above         | all `''`          | Before each punctuation mark. Merged key by key.                                 |
-| `thousandsSeparator` | string                       | U+202F            | `false`           | Replaces a space typed between groups of three digits. Never inserted.           |
-| `unitSpace`          | string                       | U+00A0            | U+00A0            | Replaces the space between a number and one of `units`.                          |
+| `thousandsSeparator` | string                       | `false`           | `false`           | Replaces a space typed between groups of three digits. Never inserted.           |
+| `unitSpace`          | string                       | `false`           | `false`           | Replaces the space between a number and one of `units`.                          |
 | `units`              | string[]                     | `UNITS`           | `UNITS`           | `%`, currencies, SI units, `px`...                                               |
-| `abbreviationSpace`  | string                       | U+00A0            | U+00A0            | After one of `abbreviations`, before a word or a number.                         |
+| `abbreviationSpace`  | string                       | `false`           | `false`           | After one of `abbreviations`, before a word or a number.                         |
 | `abbreviations`      | string[]                     | `M.`, `Mme`, `n°` | `Mr.`, `Dr.`, `p.` | Titles and references.                                                           |
 | `dash`               | string                       | `false`           | `false`           | Replaces a hyphen typed between spaces (`a - b`, `a -- b`).                      |
 | `widowSpace`         | string                       | `false`           | `false`           | Before the last word of a paragraph, so it never ends a line alone.              |
@@ -255,7 +263,7 @@ Any string works, markup included, for output that ends up as HTML (`typo.html`,
 
 ```js
 const typo = createTypo({
-  locales: { fr: { spaceBefore: { '!': '<span class="bang"> </span>' } } },
+  locales: { fr: { spaceBefore: { '!': '<span class="bang">\u202F</span>' } } },
 })
 typo.html('<p>Oui !</p>', 'fr') // <p>Oui<span class="bang"> </span>!</p>
 ```
@@ -272,17 +280,22 @@ Keep the span inline (no `inline-block`, which allows a line break), and fix a g
 createTypo({
   locales: {
     en: { quotes: false, singleQuotes: false, apostrophe: false }, // keep straight quotes
-    fr: { spaceBefore: { ':': false }, thousandsSeparator: false },
+    fr: { spaceBefore: { ':': false }, spaceInsideQuotes: false },
   },
 })
 ```
 
-### Opt-in rules
+### Turn on the rules that are off by default
 
 ```js
+import { createTypo, NBSP, NNBSP } from 'tiny-type-rules'
+
 createTypo({
   locales: {
     fr: {
+      thousandsSeparator: NNBSP,                    // 10 000 keeps together
+      unitSpace: NBSP,                              // 3 kg keeps together
+      abbreviationSpace: NBSP,                      // M. Dupont keeps together
       dash: '–',                                    // a - b becomes a – b
       widowSpace: NBSP,                             // no lone last word
       replacements: { '(c)': '©', '(tm)': '™', '->': '→' },
@@ -378,7 +391,7 @@ MDX with `@next/mdx`. Turbopack needs plugins by name with serializable options,
 // next.config.mjs
 const withMDX = createMDX({
   options: {
-    rehypePlugins: [['tiny-type-rules/rehype', { locale: 'fr', locales: { fr: { widowSpace: ' ' } } }]],
+    rehypePlugins: [['tiny-type-rules/rehype', { locale: 'fr', locales: { fr: { widowSpace: '\u00A0' } } }]],
   },
 })
 ```
@@ -419,7 +432,7 @@ For hyphenation and balanced lines, prefer CSS: `hyphens: auto` with the right `
 The narrow no-break space (U+202F) is missing from many web fonts, and from most Google Fonts files, even when the original font has it. The browser then draws that single character with a fallback font: still a narrow, unbreakable space, but its width comes from the fallback. If that matters for your design, self-host a font file that keeps U+202F, or switch to a no-break space:
 
 ```js
-createTypo({ locales: { fr: { spaceBefore: { ';': NBSP, '!': NBSP, '?': NBSP }, thousandsSeparator: NBSP } } })
+createTypo({ locales: { fr: { spaceBefore: { ';': NBSP, '!': NBSP, '?': NBSP } } } })
 ```
 
 ## API
