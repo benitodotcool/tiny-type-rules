@@ -1,0 +1,51 @@
+{
+  "name": "tiny-type-rules",
+  "version": "0.1.0",
+  "description": "Tiny, dependency-free micro-typography fixer for French and English: non-breaking spaces, quotes, apostrophes. Works on plain text, rich text and HTML.",
+  "keywords": [
+    "typography",
+    "micro-typography",
+    "french",
+    "english",
+    "non-breaking-space",
+    "nbsp",
+    "narrow-no-break-space",
+    "quotes",
+    "smartypants",
+    "html"
+  ],
+  "homepage": "https://github.com/benitodotcool/tiny-type-rules#readme",
+  "bugs": "https://github.com/benitodotcool/tiny-type-rules/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/benitodotcool/tiny-type-rules.git"
+  },
+  "license": "MIT",
+  "author": "Brun Network® (https://brun.network)",
+  "sideEffects": false,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "rm -rf dist && tsc",
+    "test": "node --test \"test/*.test.js\"",
+    "check": "tsc --noEmit && npm test && npm run build && publint --strict && attw --pack --profile esm-only",
+    "prepack": "npm run build"
+  },
+  "devDependencies": {
+    "@arethetypeswrong/cli": "^0.18.5",
+    "publint": "^0.3.25",
+    "typescript": "^7.0.2"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
