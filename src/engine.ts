@@ -57,9 +57,14 @@ export class Run {
       const r = typeof rep === 'string' ? rep : rep(m)
       out += text.slice(last, start)
       const at = out.length
+      // A mark inside the match follows the text the replacement keeps at its end (` ?` to `?`).
+      let kept = 0
+      while (kept < m[0].length && kept < r.length && m[0].at(-1 - kept) === r.at(-1 - kept)) kept++
       while (i < marks.length && marks[i]! <= start) marks[i]! += at - start, i++
-      // A mark inside the match keeps its distance from the match start, clamped to the replacement.
-      while (i < marks.length && marks[i]! < end) marks[i] = at + Math.min(marks[i]! - start, r.length), i++
+      while (i < marks.length && marks[i]! < end) {
+        const mark = marks[i]!
+        marks[i++] = end - mark <= kept ? at + r.length - (end - mark) : at + Math.min(mark - start, r.length - kept)
+      }
       out += r
       last = end
     }
@@ -96,7 +101,9 @@ function opens(m: RegExpMatchArray, depth: number): boolean {
 /** Turns a locale config into the function that applies it. */
 export function compile(c: LocaleConfig): (run: Run) => void {
   const steps: ((run: Run) => void)[] = []
-  const add = (re: RegExp, rep: Replacer) => steps.push((run) => run.replace(re, rep))
+  // `need`: a string the text must contain for the rule to run at all.
+  const add = (re: RegExp, rep: Replacer, need = '') =>
+    steps.push((run) => run.text.includes(need) && run.replace(re, rep))
   const q = c.quotes || undefined
   const words = (list: readonly string[]) => [...list].sort((a, b) => b.length - a.length).map(esc).join('|')
 
@@ -138,8 +145,8 @@ export function compile(c: LocaleConfig): (run: Run) => void {
     const space = c.spaceBefore![punct]
     if (!isSet(space)) continue
     const guard = ':;'.includes(punct) ? EMOTICON : ''
-    // Matches the spaces only, so the mark itself never moves across a tag or a span.
-    add(new RegExp(`${before}${S}*(?=(?:${esc(punct)})+${guard}${AFTER_PUNCT})`, 'gu'), space)
+    const re = new RegExp(`${before}${S}*((?:${esc(punct)})+)${guard}${AFTER_PUNCT}`, 'gu')
+    add(re, (m) => space + m[1], punct)
   }
   if (isSet(c.thousandsSeparator)) {
     add(new RegExp(`(?<=(?<![\\d.,])\\d{1,3}(?:${S}\\d{3})*)${S}(?=\\d{3}(?!\\d))`, 'gu'), c.thousandsSeparator)
