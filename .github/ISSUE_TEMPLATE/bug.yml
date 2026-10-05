@@ -1,0 +1,27 @@
+name: Wrong output
+description: The library changed text it should not have, or missed a rule.
+labels: [bug]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      placeholder: 0.1.0
+    validations:
+      required: true
+  - type: textarea
+    id: input
+    attributes:
+      label: Input and call
+      description: The smallest input that shows the problem, and the function you called.
+      render: js
+      placeholder: fixText('Bonjour !', 'fr')
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: Actual and expected output
+      description: Write U+00A0 as ~ and U+202F as ^ so invisible spaces show.
+    validations:
+      required: true

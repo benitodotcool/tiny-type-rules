@@ -1,0 +1,23 @@
+name: Language or rule request
+description: A new language, a regional variant, or a rule that is missing.
+labels: [enhancement]
+body:
+  - type: input
+    id: language
+    attributes:
+      label: Language tag
+      placeholder: de, fr-CH, es
+  - type: textarea
+    id: rules
+    attributes:
+      label: Rules
+      description: Each rule with a before and after example.
+    validations:
+      required: true
+  - type: textarea
+    id: sources
+    attributes:
+      label: Sources
+      description: Style guides or references the rules come from.
+    validations:
+      required: true
