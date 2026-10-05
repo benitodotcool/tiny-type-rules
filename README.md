@@ -14,7 +14,7 @@ fixText('She said "it\'s fine" !', 'en')       // She said “it’s fine”!
 ```
 
 - **Tiny and fast.** No dependency, under 9 kB gzipped before minification, a few microseconds per string.
-- **Works everywhere.** Server first (SSR, static builds, edge), browser too. Plain text, HTML, Portable Text, rehype / MDX, live DOM, with ready-made components for Next.js, Nuxt, React and Vue.
+- **Works everywhere.** Server first (SSR, static builds, edge), browser too. Plain text, HTML, Portable Text, rehype / MDX, live DOM, and automatic in Next.js and Nuxt: set it up once, every text of the app is fixed.
 - **Yours to tune.** Each language is a plain settings object. Change one character, turn a rule off, add a language.
 - **Accessible by design.** Only swaps characters for their Unicode equivalents: no markup, no invisible characters, nothing that changes what a screen reader announces.
 - **Safe on markup.** Tags, attributes and code are never touched, the spacing rules leave URLs, times and emails alone, and running it twice changes nothing.
@@ -163,7 +163,7 @@ import { watchElement } from 'tiny-type-rules'
 const stop = watchElement(document.body)
 ```
 
-In a React or Vue app, the [framework components](#frameworks) do this for you after hydration.
+In Next.js and Nuxt, the [integrations](#frameworks) fix the text while it renders, and their `auto` option does this after hydration.
 
 ## HTML attributes
 
@@ -233,6 +233,8 @@ typo.portableText(blocks, 'fr')
 typo.element(document.body)
 typo.hast(tree, 'fr')
 ```
+
+In Next.js and Nuxt, the same `locales` object goes to `TTRProvider` or to `ttr` in `nuxt.config`.
 
 Every value follows the same convention: **a string** replaces (inserting the space when it is missing), **`''`** removes, **`false`** leaves the text as typed.
 
@@ -341,82 +343,52 @@ Built your language and checked it against a reference? A pull request is welcom
 
 ## Frameworks
 
-Two ways to use it, and they combine:
+In Next.js and Nuxt, set it up once and every text of your app is fixed while it renders: the HTML your server sends is already right, the browser renders the very same text, and there is nothing to wrap. Use the [HTML attributes](#html-attributes) to turn the rules off, back on, or to another language for part of a page.
 
-- **`<Typo>`, at render.** Wrap the text that comes from your data. The HTML your server sends is already right, and since the same input always gives the same output, the browser renders the same text: no hydration mismatch.
-- **`auto` mode, in the browser.** One switch fixes the whole page once it is hydrated, then every text that changes or appears. Nothing to wrap, but the HTML your server sends is not fixed, and the text can shift a moment after load. Use it as a safety net, or for content you do not control.
+What gets fixed:
 
-`<Typo>` takes the same props in React and Vue:
+- every text you write in JSX or a Vue template, and every value you print in it (`{post.title}`, `{{ page.title }}`);
+- HTML you inject (`dangerouslySetInnerHTML`, `v-html`);
+- Portable Text you hand to a component as `value` (`<PortableText value={body} />`, `<SanityContent :value="body" />`), before the component renders it.
 
-| Prop                 | Description                                                                          |
-| -------------------- | ------------------------------------------------------------------------------------ |
-| children / slot      | The text to fix, inline elements and child components included.                      |
-| `locale`             | Language of the text. Default: the locale of your settings.                          |
-| `html`               | An HTML string to fix and render, in place of children.                              |
-| `as`                 | The element that receives `html`. Default: `div`.                                    |
-| `typo`               | A fixer from `createTypo`, for settings of its own.                                  |
-
-`<Typo>` sees the text you write inside it, through inline elements and into the children you pass to other components (`<Link>Home !</Link>`). Text that a component renders on its own (`<Article />`) is out of its reach: wrap the text inside that component, or turn on `auto`. Inline `code`, an element with another `lang`, and `data-ttr-prevent` are left untouched.
+Text that a third-party component builds on its own, from data it fetched itself, is out of reach. Fix that data with the [core functions](#usage), or turn on `auto`, which also fixes the page in the browser after hydration.
 
 ### Next.js
 
-Tested with Next.js 16 (App Router). Server Components cannot read React context, so the settings live in a small module that both sides import:
+Tested with Next.js 16 (App Router), in Server and Client Components. Two lines. In `tsconfig.json`, let JSX go through the library:
 
-```ts
-// app/typo.ts
-import { defineTypo } from 'tiny-type-rules/react'
-
-export const settings = { locale: 'fr', locales: { fr: { widowSpace: '\u00A0' } } }
-export const { Typo, typo } = defineTypo(settings)
+```jsonc
+{
+  "compilerOptions": {
+    "jsxImportSource": "tiny-type-rules/react"
+  }
+}
 ```
+
+In the root layout, set the language:
 
 ```tsx
 // app/layout.tsx
-import { TypoProvider } from 'tiny-type-rules/react'
-import { settings } from './typo'
+import { TTRProvider } from 'tiny-type-rules/react'
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="fr">
       <body>
-        <TypoProvider {...settings} auto>
-          {children}
-        </TypoProvider>
+        <TTRProvider locale="fr">{children}</TTRProvider>
       </body>
     </html>
   )
 }
 ```
 
-```tsx
-// app/blog/[slug]/page.tsx, a Server Component
-import { PortableText } from '@portabletext/react'
-import { Typo, typo } from '../../typo'
+That is all: `<h1>{post.title}</h1>` comes out fixed. `TTRProvider` takes `locale`, `locales` (your [settings](#settings)) and `auto`.
 
-export default async function Post({ params }: { params: Promise<{ slug: string }> }) {
-  const post = await getPost((await params).slug)
-  return (
-    <article>
-      <h1><Typo>{post.title}</Typo></h1>
-      <Typo as="div" html={post.html} />
-      <PortableText value={typo.portableText(post.body)} />
-    </article>
-  )
-}
-```
+A site in several languages sets the language per request, for instance in `app/[lang]/layout.tsx`: `<TTRProvider locale={lang}>`. A nested provider overrides its parent.
 
-In a Client Component, `useTypo()` returns the fixer of the provider:
+For a text that is no child of an element (an attribute, a `title`), `useTTR()` returns the fixer of the provider in a Client Component: `placeholder={useTTR().text('Votre nom : ici')}`.
 
-```tsx
-'use client'
-import { useTypo } from 'tiny-type-rules/react'
-
-export function Caption({ text }: { text: string }) {
-  return <figcaption>{useTypo().text(text)}</figcaption>
-}
-```
-
-Leave out `auto` to fix only what you wrap. With the Pages Router, put `TypoProvider` in `_app.tsx`; `Typo` works the same.
+With the Pages Router, put `TTRProvider` in `_app.tsx`; the `jsxImportSource` line is the same.
 
 MDX with `@next/mdx`. Turbopack needs plugins by name with serializable options, which `tiny-type-rules/rehype` supports:
 
@@ -424,7 +396,7 @@ MDX with `@next/mdx`. Turbopack needs plugins by name with serializable options,
 // next.config.mjs
 const withMDX = createMDX({
   options: {
-    rehypePlugins: [['tiny-type-rules/rehype', { locale: 'fr', locales: { fr: { widowSpace: '\u00A0' } } }]],
+    rehypePlugins: [['tiny-type-rules/rehype', { locale: 'fr' }]],
   },
 })
 ```
@@ -433,46 +405,37 @@ The same plugin works with `react-markdown`: `rehypePlugins={[[rehypeTinyTypeRul
 
 ### Nuxt
 
-Tested with Nuxt 4. The module reads its settings from `typo` in `nuxt.config`, and auto-imports `<Typo>` and `useTypo()`:
+Tested with Nuxt 4. Add the module, nothing else:
 
 ```ts
 // nuxt.config.ts
 export default defineNuxtConfig({
   modules: ['tiny-type-rules/nuxt'],
-  app: { head: { htmlAttrs: { lang: 'fr' } } },
-  typo: {
-    auto: true,
-    locales: { fr: { widowSpace: '\u00A0' } },
-  },
+  ttr: { locale: 'fr' },
 })
 ```
 
-`typo` takes `locale`, `locales` and `auto`, all optional. Without `locale`, the module uses `app.head.htmlAttrs.lang`.
+Every template of your app is fixed while it renders, `v-html` and Portable Text passed as `:value` included. `ttr` takes `locale`, `locales` (your [settings](#settings)) and `auto`, all optional. Without `locale`, the module uses `app.head.htmlAttrs.lang`. With `@nuxtjs/i18n`, the rules follow the current language.
 
-```vue
-<script setup lang="ts">
-const typo = useTypo()
-const { data: page } = await useAsyncData('page', () => $fetch('/api/page'))
-</script>
-
-<template>
-  <h1><Typo>{{ page.title }}</Typo></h1>
-  <Typo as="section" :html="page.html" />
-  <PortableText :value="typo.portableText(page.body)" />
-</template>
-```
-
-With a live data source (`useSanityQuery`), fix in a `computed` so updates stay reactive: `computed(() => typo.portableText(data.value?.body ?? []))`. A site in several languages passes the current one: `<Typo :locale="locale">`.
+For a text that is not in a template (an attribute built in script, a meta tag), `useTTR()` is auto-imported: `useTTR().text('Votre nom : ici')`.
 
 ### Vue
 
-Without Nuxt, install the plugin and register the component:
+Without Nuxt, add the template transform to the Vue compiler and install the plugin:
 
 ```ts
-import { createApp } from 'vue'
-import { Typo, TypoPlugin } from 'tiny-type-rules/vue'
+// vite.config.ts
+import vue from '@vitejs/plugin-vue'
+import { ttrTransform } from 'tiny-type-rules/vue'
 
-createApp(App).use(TypoPlugin, { locale: 'fr', auto: true }).component('Typo', Typo).mount('#app')
+export default { plugins: [vue({ template: { compilerOptions: { nodeTransforms: [ttrTransform] } } })] }
+```
+
+```ts
+// main.ts
+import { TTRPlugin } from 'tiny-type-rules/vue'
+
+createApp(App).use(TTRPlugin, { locale: 'fr' }).mount('#app')
 ```
 
 ### Any other site
@@ -532,9 +495,9 @@ createTypo({ locales: { fr: { spaceBefore: { ';': NBSP, '!': NBSP, '?': NBSP } }
 
 | Entry point               | Exports                                                                              |
 | ------------------------- | ------------------------------------------------------------------------------------ |
-| `tiny-type-rules/react`   | `Typo`, `defineTypo(settings)`, `TypoProvider` (`auto`, `locale`, `locales`), `useTypo()` |
-| `tiny-type-rules/vue`     | `Typo`, `TypoPlugin` (`auto`, `locale`, `locales`), `useTypo()`, `TYPO_KEY`           |
-| `tiny-type-rules/nuxt`    | The Nuxt module, configured under `typo` in `nuxt.config`                             |
+| `tiny-type-rules/react`   | `TTRProvider` (`locale`, `locales`, `auto`), `useTTR()`, and the JSX runtime for `jsxImportSource` |
+| `tiny-type-rules/vue`     | `ttrTransform` for the Vue compiler, `TTRPlugin` (`locale`, `locales`, `auto`, `getLocale`), `useTTR()` |
+| `tiny-type-rules/nuxt`    | The Nuxt module, configured under `ttr` in `nuxt.config`                              |
 | `tiny-type-rules/rehype`  | The rehype plugin, as default export                                                 |
 
 ## Compatibility
