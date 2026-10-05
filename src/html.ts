@@ -1,10 +1,8 @@
+import { enter, INLINE, type FixParts, type Scope } from './scope.ts'
+
 const TOKEN =
   /<!--[\s\S]*?-->|<(script|style|textarea)\b[^>]*>[\s\S]*?<\/\1\s*>|<(\/?)([a-z][\w:-]*)((?:[^>"']|"[^"]*"|'[^']*')*)>|<[!?][^>]*>|&(#\d+|#x[\da-f]+|[a-z][a-z\d]*);/gi
 
-const INLINE = new Set(
-  'a abbr b bdi bdo cite data del dfn em font i ins mark q s small span strong sub sup time u wbr'.split(' '),
-)
-const SKIP = new Set('code kbd math pre samp script style svg textarea var'.split(' '))
 const VOID = new Set('area base br col embed hr img input link meta source track wbr'.split(' '))
 const ENTITIES: Record<string, string> = {
   nbsp: ' ',
@@ -29,20 +27,17 @@ function decode(entity: string): string | undefined {
   return '<>&'.includes(char) ? undefined : char
 }
 
-const attribute = (name: string) => {
-  const re = new RegExp(`\\s${name}(?:\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s"'>]+)))?(?=[\\s/>]|$)`, 'i')
-  return (attrs: string) => {
-    const m = re.exec(attrs)
-    return m && (m[1] ?? m[2] ?? m[3] ?? '')
-  }
-}
-const LANG = attribute('lang')
-const TTR_LANG = attribute('data-ttr-lang')
-const PREVENT = attribute('data-prevent-ttr')
-const ENABLE = attribute('data-ttr')
+const ATTRIBUTES = new Map(
+  ['lang', 'data-ttr-lang', 'data-prevent-ttr', 'data-ttr'].map((name) => [
+    name,
+    new RegExp(`\\s${name}(?:\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s"'>]+)))?(?=[\\s/>]|$)`, 'i'),
+  ]),
+)
 
-type Scope = { name: string; depth: number; skip: boolean; locale: string | undefined }
-type FixParts = (parts: readonly string[], locale: string) => string[] | undefined
+const reader = (attrs: string) => (name: string) => {
+  const m = ATTRIBUTES.get(name)!.exec(attrs)
+  return m && (m[1] ?? m[2] ?? m[3] ?? '')
+}
 
 /**
  * Walks HTML with a regex tokenizer: text between inline tags is fixed as one run,
@@ -98,13 +93,10 @@ export function fixHtmlWith(fix: FixParts, html: string, locale?: string): strin
       out += token
     } else {
       const opens = !closing && !VOID.has(name) && !attrs.endsWith('/')
-      const lang = opens ? (TTR_LANG(attrs) ?? LANG(attrs)) : null
-      const prevent = opens && PREVENT(attrs) !== null
-      const enable = opens && ENABLE(attrs) !== null
-      if (opens && (lang !== null || prevent || enable || SKIP.has(name))) {
+      const scope = opens ? enter(name, reader(attrs), top) : undefined
+      if (scope) {
         flush()
-        const skip = enable ? false : prevent || top.skip || SKIP.has(name)
-        scopes.push({ name, depth: 0, skip, locale: lang ?? top.locale })
+        scopes.push(scope)
         out += token
         continue
       }
