@@ -1,5 +1,6 @@
 import { compile, Run, type LocaleConfig } from './engine.ts'
 import { fixHtmlWith } from './html.ts'
+import { OPAQUE, type FixParts } from './scope.ts'
 import { fixDomWith, fixHastWith, type DomNode, type HastNode } from './tree.ts'
 import { en } from './locales/en.ts'
 import { fr } from './locales/fr.ts'
@@ -53,7 +54,16 @@ const isCode = (span: Span) => Array.isArray(span.marks) && span.marks.includes(
 
 const BUILT_IN: Record<string, LocaleConfig> = { fr, en }
 
-const language = (tag: string) => tag.toLowerCase().split(/[-_]/)[0]!
+const normalize = (tag: string) => tag.trim().toLowerCase().replaceAll('_', '-')
+
+/** RFC 4647 lookup: `fr-ca-u-nu-latn`, then `fr-ca-u-nu`... down to `fr`. */
+function lookup<T>(map: Map<string, T>, tag: string): T | undefined {
+  for (;;) {
+    const found = map.get(tag)
+    if (found || !tag.includes('-')) return found
+    tag = tag.slice(0, tag.lastIndexOf('-'))
+  }
+}
 
 const merge = (base: LocaleConfig = {}, over: LocaleConfig): LocaleConfig => ({
   ...base,
@@ -65,49 +75,44 @@ const merge = (base: LocaleConfig = {}, over: LocaleConfig): LocaleConfig => ({
 /** Creates a fixer with your own settings. */
 export function createTypo(options: TypoOptions = {}): Typo {
   const configs = new Map(Object.entries(BUILT_IN))
-  const custom = Object.entries(options.locales ?? {}).map(([tag, config]) => [tag.toLowerCase().replaceAll('_', '-'), config] as const)
+  const custom = Object.entries(options.locales ?? {}).map(([tag, config]) => [normalize(tag), config] as const)
   // Languages before regions, so `fr-CH` extends the customized `fr`.
   custom.sort(([a], [b]) => a.split('-').length - b.split('-').length)
-  for (const [tag, config] of custom) configs.set(tag, merge(configs.get(tag) ?? configs.get(language(tag)), config))
+  for (const [tag, config] of custom) configs.set(tag, merge(lookup(configs, tag), config))
 
   const compiled = new Map([...configs].map(([tag, config]) => [tag, compile(config)]))
-  const rules = (locale: string) =>
-    typeof locale !== 'string'
-      ? undefined
-      : (compiled.get(locale.toLowerCase().replaceAll('_', '-')) ?? compiled.get(language(locale)))
 
-  const fix = (parts: readonly string[], locale: string) => {
-    const apply = rules(locale)
+  const fix: FixParts = (parts, locale, before = '', after = '') => {
+    const apply = typeof locale === 'string' ? lookup(compiled, normalize(locale)) : undefined
     if (!apply) return undefined
+    const all = [before, ...parts, after]
     const marks: number[] = []
     let at = 0
-    for (const part of parts.slice(0, -1)) marks.push((at += part.length))
-    const run = new Run(parts.join(''), marks)
+    for (const part of all.slice(0, -1)) marks.push((at += part.length))
+    const run = new Run(all.join(''), marks)
     apply(run)
-    return [0, ...run.marks].map((start, i) => run.text.slice(start, run.marks[i] ?? run.text.length))
+    return parts.map((_, i) => run.text.slice(run.marks[i], run.marks[i + 1]))
   }
 
   return {
-    text: (text, locale) => (typeof text === 'string' && fix([text], locale)?.[0]) || text,
+    text: (text, locale) => (typeof text === 'string' ? (fix([text], locale)?.[0] ?? text) : text),
     parts: (parts, locale) => (parts.length && fix(parts, locale)) || [...parts],
     html: (html, locale) => (typeof html === 'string' ? fixHtmlWith(fix, html, locale) : html),
     portableText: (blocks, locale) =>
-      !Array.isArray(blocks) ? (blocks as never) : blocks.map((block) => {
-        const { _type, children } = (block ?? {}) as { _type?: unknown; children?: unknown }
-        if (_type !== 'block' || !Array.isArray(children)) return block
-        const fixed = new Map<Span, string>()
-        let run: Span[] = []
-        const flush = () => {
-          if (run.length) fix(run.map((span) => span.text as string), locale)?.forEach((text, i) => fixed.set(run[i]!, text))
-          run = []
-        }
-        for (const child of children as Span[]) {
-          if (child?._type !== 'span' || typeof child.text !== 'string' || isCode(child)) flush()
-          else run.push(child)
-        }
-        flush()
-        return { ...block, children: children.map((child) => (fixed.has(child) ? { ...child, text: fixed.get(child) } : child)) }
-      }),
+      !Array.isArray(blocks)
+        ? (blocks as never)
+        : blocks.map((block) => {
+            const { _type, children } = (block ?? {}) as { _type?: unknown; children?: unknown }
+            if (_type !== 'block' || !Array.isArray(children)) return block
+            // Code spans and inline objects stay as they are, but the rules see a word there.
+            const isText = (c: Span) => c?._type === 'span' && typeof c.text === 'string' && !isCode(c)
+            const fixed = fix(
+              children.map((c: Span) => (isText(c) ? (c.text as string) : OPAQUE)),
+              locale,
+            )
+            if (!fixed) return block
+            return { ...block, children: children.map((c: Span, i) => (isText(c) ? { ...c, text: fixed[i] } : c)) }
+          }),
     element: (root, locale) => fixDomWith(fix, root, locale),
     hast: (tree, locale) => fixHastWith(fix, tree, locale),
   }

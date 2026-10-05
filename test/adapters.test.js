@@ -12,7 +12,7 @@ test('Portable Text: spans fixed as one run, code spans and other blocks untouch
       children: [
         { _type: 'span', _key: 'a', text: 'Il a dit ', marks: [] },
         { _type: 'span', _key: 'b', text: '"oui"', marks: ['em'] },
-        { _type: 'span', _key: 'c', text: ' !', marks: [] },
+        { _type: 'span', _key: 'c', text: ' ! ', marks: [] },
         { _type: 'span', _key: 'd', text: 'a !b', marks: ['code'] },
         { _type: 'span', _key: 'e', text: ' ok ?', marks: [] },
       ],
@@ -25,7 +25,7 @@ test('Portable Text: spans fixed as one run, code spans and other blocks untouch
   assert.deepEqual(blocks, input)
   assert.deepEqual(
     out[0].children.map((c) => c.text),
-    ['Il a dit ', '«~oui~»', '^!', 'a !b', ' ok^?'].map(nb),
+    ['Il a dit ', '«~oui~»', '^! ', 'a !b', ' ok^?'].map(nb),
   )
   assert.equal(out[0].children[1]._key, 'b')
   assert.equal(out[1], blocks[1])

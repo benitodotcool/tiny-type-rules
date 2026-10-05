@@ -1,40 +1,74 @@
-import { enter, INLINE, type FixParts, type Scope } from './scope.ts'
+import { enter, INLINE, OPAQUE, SKIP, type FixParts, type Scope } from './scope.ts'
 
-/** How to read one kind of tree. `tag` is undefined for nodes that are neither text nor element. */
+/**
+ * How to read one kind of tree. `kind`: text, element, transparent (comments), opaque
+ * (inline content to see as a word, such as an MDX expression), or block (anything else).
+ */
 interface Adapter<N> {
-  text(node: N): string | undefined
+  kind(node: N): 'text' | 'element' | 'transparent' | 'opaque' | 'block'
+  text(node: N): string
   setText(node: N, text: string): void
-  tag(node: N): string | undefined
+  tag(node: N): string
   attr(node: N, name: string): string | null
   children(node: N): Iterable<N> | undefined
 }
 
 /** Fixes the text nodes of a tree in place, with the same scoping as the HTML parser. */
 function fixTree<N>(a: Adapter<N>, fix: FixParts, root: N, scope: Scope): void {
-  let run: N[] = []
+  let nodes: (N | undefined)[] = []
+  let parts: string[] = []
   let runScope = scope
+  let before = ''
 
-  const flush = () => {
-    const fixed = run.length && !runScope.skip && runScope.locale ? fix(run.map((n) => a.text(n)!), runScope.locale) : undefined
-    fixed?.forEach((text, i) => text !== a.text(run[i]!) && a.setText(run[i]!, text))
-    run = []
+  const firstChar = (list: N[]): string => {
+    for (const node of list) {
+      const kind = a.kind(node)
+      if (kind === 'text' && a.text(node)) return a.text(node)[0]!
+      if (kind === 'opaque') return OPAQUE
+      if (kind === 'element') {
+        const found = firstChar([...(a.children(node) ?? [])])
+        if (found) return found
+      }
+    }
+    return ''
   }
+  const flush = (after = '') => {
+    const fixed = parts.length && !runScope.skip && runScope.locale ? fix(parts, runScope.locale, before, after) : undefined
+    fixed?.forEach((text, i) => nodes[i] && text !== parts[i] && a.setText(nodes[i]!, text))
+    before = (fixed ?? parts).join('').slice(-1) || before
+    nodes = []
+    parts = []
+  }
+  const add = (node: N | undefined, text: string, scope: Scope) => {
+    if (scope !== runScope) flush()
+    runScope = scope
+    nodes.push(node)
+    parts.push(text)
+  }
+
   const walk = (node: N, scope: Scope) => {
-    for (const child of [...(a.children(node) ?? [])]) {
-      if (a.text(child) !== undefined) {
-        runScope = scope
-        run.push(child)
-        continue
+    const children = [...(a.children(node) ?? [])]
+    children.forEach((child, i) => {
+      const kind = a.kind(child)
+      if (kind === 'text') return add(child, a.text(child), scope)
+      if (kind === 'opaque') return add(undefined, OPAQUE, scope)
+      if (kind === 'transparent') return
+      if (kind === 'block') {
+        flush()
+        before = ''
+        return walk(child, scope)
       }
       const tag = a.tag(child)
-      // Comments and other childless non-elements are transparent.
-      if (tag === undefined && ![...(a.children(child) ?? [])].length) continue
-      const inner = tag === undefined ? scope : (enter(tag, (name) => a.attr(child, name), scope) ?? scope)
-      const boundary = inner !== scope || !INLINE.has(tag ?? '')
-      if (boundary) flush()
+      const inner = enter(tag, (name) => a.attr(child, name), scope) ?? scope
+      if (inner.skip && SKIP.has(tag) && INLINE.has(tag)) return add(undefined, OPAQUE, scope)
+      const inline = INLINE.has(tag)
+      if (inner === scope && inline) return walk(child, scope)
+      flush(inline ? firstChar([child]) : '')
+      if (!inline) before = ''
       walk(child, inner)
-      if (boundary) flush()
-    }
+      flush(inline ? firstChar(children.slice(i + 1)) : '')
+      if (!inline) before = ''
+    })
   }
   walk(root, scope)
   flush()
@@ -53,9 +87,10 @@ export interface DomNode {
 }
 
 const dom: Adapter<DomNode> = {
-  text: (n) => (n.nodeType === 3 ? (n.nodeValue ?? '') : undefined),
+  kind: (n) => (n.nodeType === 3 ? 'text' : n.nodeType === 1 ? 'element' : n.nodeType === 8 ? 'transparent' : 'block'),
+  text: (n) => n.nodeValue ?? '',
   setText: (n, text) => void (n.nodeValue = text),
-  tag: (n) => (n.nodeType === 1 ? n.localName : undefined),
+  tag: (n) => n.localName ?? '',
   attr: (n, name) => n.getAttribute?.(name) ?? null,
   children: (n) => n.childNodes,
 }
@@ -63,11 +98,8 @@ const dom: Adapter<DomNode> = {
 export function fixDomWith(fix: FixParts, root: DomNode, locale?: string): void {
   const chain: DomNode[] = []
   for (let n = root.parentElement; n; n = n.parentElement) chain.unshift(n)
-  const scope = chain.reduce((s, el) => enter(el.localName!, (name) => dom.attr(el, name), s) ?? s, base(locale))
-  if (root.nodeType === 3) {
-    const fixed = !scope.skip && scope.locale ? fix([root.nodeValue ?? ''], scope.locale) : undefined
-    if (fixed && fixed[0] !== root.nodeValue) root.nodeValue = fixed[0]!
-  } else fixTree(dom, fix, { nodeType: 11, nodeValue: null, childNodes: [root], parentElement: null }, scope)
+  const scope = chain.reduce((s, el) => enter(dom.tag(el), (name) => dom.attr(el, name), s) ?? s, base(locale))
+  fixTree(dom, fix, { nodeType: 11, nodeValue: null, childNodes: [root], parentElement: null }, scope)
 }
 
 /** The subset of a hast (rehype) or MDX node this library reads. */
@@ -84,20 +116,25 @@ export interface HastNode {
 const camel = (name: string) => name.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase())
 
 const hast: Adapter<HastNode> = {
-  text: (n) => (n.type === 'text' ? (n.value ?? '') : undefined),
-  setText: (n, text) => void (n.value = text),
-  tag: (n) => {
-    if (n.type === 'element') return n.tagName
-    if (n.type.startsWith('mdxJsx')) return n.name ?? 'fragment'
-    return n.type === 'raw' ? 'raw' : undefined
+  kind: (n) => {
+    if (n.type === 'text') return 'text'
+    if (n.type === 'element' || n.type === 'mdxJsxFlowElement' || n.type === 'mdxJsxTextElement') return 'element'
+    if (n.type === 'comment') return 'transparent'
+    return n.type === 'mdxTextExpression' ? 'opaque' : 'block'
   },
+  text: (n) => n.value ?? '',
+  setText: (n, text) => void (n.value = text),
+  tag: (n) => (n.type === 'element' ? n.tagName! : n.type === 'mdxJsxTextElement' ? 'span' : 'div'),
   attr: (n, name) => {
     if (n.properties) {
       const v = n.properties[camel(name)]
       return v === undefined || v === null || v === false ? null : v === true ? '' : [v].flat().join(' ')
     }
     const a = n.attributes?.find((a) => a.type === 'mdxJsxAttribute' && a.name === name)
-    return a ? (typeof a.value === 'string' ? a.value : '') : null
+    if (!a) return null
+    if (typeof a.value === 'string') return a.value
+    // `{false}` written as an MDX expression turns the attribute off.
+    return (a.value as { value?: unknown } | null)?.value === 'false' ? null : ''
   },
   children: (n) => n.children,
 }

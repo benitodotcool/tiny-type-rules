@@ -73,12 +73,25 @@ export class Run {
 const S = '[ \\t\\u00A0\\u2000-\\u200A\\u202F\\u205F]'
 const OPENERS = '\\s\\p{Ps}\\p{Pi}\\-\\u2013\\u2014/'
 const AFTER_PUNCT = '(?=$|[\\s\\p{Pe}\\p{Pi}\\p{Pf}.,…;:!?"\'])'
-const OPENING = new RegExp(`[${OPENERS}]`, 'u')
+// What may sit right before an opening quote, and right after a closing one.
+const QUOTE_BEFORE = new RegExp(`[${OPENERS}:;,]`, 'u')
+const QUOTE_AFTER = /[\s\p{Pe}\p{Pf}.,…;:!?]/u
+// Breakable spaces, the only ones widows glue.
+const BREAKABLE = '[ \\t\\u2000-\\u2006\\u2008-\\u200A\\u205F]'
+const EMOTICON = '(?!-?[()DPp](?![\\p{L}\\p{N}]))'
 
 // Config strings enter regexes as code points, safe both inside and outside a class.
 const esc = (s: string) => [...s].map((ch) => `\\u{${ch.codePointAt(0)!.toString(16)}}`).join('')
 const isSet = (v: false | string | undefined): v is string => typeof v === 'string'
-const isOpening = (m: RegExpMatchArray) => m.index === 0 || OPENING.test(m.input![m.index! - 1]!)
+
+/** Whether a straight quote opens: from its neighbours, and from the nesting when they are ambiguous. */
+function opens(m: RegExpMatchArray, depth: number): boolean {
+  const s = m.input!
+  const i = m.index!
+  const before = i === 0 || QUOTE_BEFORE.test(s[i - 1]!)
+  const after = i + 1 >= s.length || QUOTE_AFTER.test(s[i + 1]!)
+  return before === after ? depth === 0 : before
+}
 
 /** Turns a locale config into the function that applies it. */
 export function compile(c: LocaleConfig): (run: Run) => void {
@@ -88,6 +101,7 @@ export function compile(c: LocaleConfig): (run: Run) => void {
   const words = (list: readonly string[]) => [...list].sort((a, b) => b.length - a.length).map(esc).join('|')
 
   for (const [from, to] of Object.entries(c.replacements ?? {})) if (from) add(new RegExp(esc(from), 'gu'), to)
+  if (isSet(c.ellipsis)) add(/(?<!\.)\.\.\.(?!\.)/g, c.ellipsis)
 
   if (isSet(c.apostrophe)) {
     add(/(?<=[\p{L}\p{N}])'(?=\p{L})/gu, c.apostrophe)
@@ -97,15 +111,18 @@ export function compile(c: LocaleConfig): (run: Run) => void {
     const re = new RegExp(['"', "'", ...(q ? [q[0], q[1]] : [])].map(esc).join('|'), 'gu')
     steps.push((run) => {
       let depth = 0
+      let single = 0
       run.replace(re, (m) => {
         const ch = m[0]
         if (ch === "'") {
-          if (c.singleQuotes) return c.singleQuotes[isOpening(m) ? 0 : 1]
-          return isSet(c.apostrophe) ? c.apostrophe : ch
+          if (!c.singleQuotes) return isSet(c.apostrophe) ? c.apostrophe : ch
+          if (opens(m, single)) return single++, c.singleQuotes[0]
+          single = Math.max(0, single - 1)
+          return c.singleQuotes[1]
         }
         if (ch !== '"') return (depth = ch === q![0] ? depth + 1 : Math.max(0, depth - 1)), ch
         if (!q) return ch
-        if (isOpening(m)) return q[depth++ ? 2 : 0]
+        if (opens(m, depth)) return q[depth++ ? 2 : 0]
         depth = Math.max(0, depth - 1)
         return q[depth ? 3 : 1]
       })
@@ -120,23 +137,26 @@ export function compile(c: LocaleConfig): (run: Run) => void {
   for (const punct of puncts) {
     const space = c.spaceBefore![punct]
     if (!isSet(space)) continue
-    add(new RegExp(`${before}${S}*((?:${esc(punct)})+)${AFTER_PUNCT}`, 'gu'), (m) => space + m[1])
+    const guard = ':;'.includes(punct) ? EMOTICON : ''
+    // Matches the spaces only, so the mark itself never moves across a tag or a span.
+    add(new RegExp(`${before}${S}*(?=(?:${esc(punct)})+${guard}${AFTER_PUNCT})`, 'gu'), space)
   }
   if (isSet(c.thousandsSeparator)) {
     add(new RegExp(`(?<=(?<![\\d.,])\\d{1,3}(?:${S}\\d{3})*)${S}(?=\\d{3}(?!\\d))`, 'gu'), c.thousandsSeparator)
   }
-  if (isSet(c.ellipsis)) add(/(?<!\.)\.\.\.(?!\.)/g, c.ellipsis)
   if (isSet(c.unitSpace) && c.units?.length) {
-    add(new RegExp(`(?<=\\d)${S}+(?=(?:${words(c.units)})(?![\\p{L}\\p{N}]))`, 'gu'), c.unitSpace)
+    add(new RegExp(`(?<=\\d)${S}+(?=(?:${words(c.units)})(?![\\p{L}\\p{N}'’]))`, 'gu'), c.unitSpace)
   }
   if (isSet(c.abbreviationSpace) && c.abbreviations?.length) {
     const abbr = `(?<![\\p{L}\\p{N}])(?:${words(c.abbreviations)})`
     add(new RegExp(`(?<=${abbr})${S}+(?=[\\p{L}\\p{N}])`, 'gu'), c.abbreviationSpace)
   }
   if (isSet(c.dash)) add(new RegExp(`(?<=\\S${S})--?(?=${S}\\S)`, 'gu'), c.dash)
-  // Last, so the final word carries its punctuation (`cri !`); only breakable spaces are glued.
+  // Last, so the final word carries the punctuation after it (`cri !`, `fin …`).
   if (isSet(c.widowSpace)) {
-    add(/(?<=\S)[ \t\u2000-\u2006\u2008-\u200A\u205F]+(?=\S+(?:[\u00A0\u2007\u202F]+[^\s\p{L}\p{N}]+)*\s*$)/gu, c.widowSpace)
+    const tail = '(?:\\s+[^\\s\\p{L}\\p{N}]+)*\\s*$'
+    add(new RegExp(`(?<=\\S)${BREAKABLE}+(?=[^\\s\\p{L}\\p{N}]+${tail})`, 'gu'), c.widowSpace)
+    add(new RegExp(`(?<=\\S)${BREAKABLE}+(?=\\S*[\\p{L}\\p{N}]\\S*${tail})`, 'gu'), c.widowSpace)
   }
   return (run) => steps.forEach((step) => step(run))
 }
