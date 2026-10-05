@@ -173,7 +173,9 @@ export function compile(c: LocaleConfig): (run: Run) => void {
     add(re, (m) => space + m[1], punct)
   }
   if (isSet(c.thousandsSeparator)) {
-    add(new RegExp(`(?<=(?<![\\d.,])\\d{1,3}(?:${S}\\d{3})*)${S}(?=\\d{3}(?!\\d))`, 'gu'), c.thousandsSeparator)
+    const sep = c.thousandsSeparator
+    const space = new RegExp(S, 'gu')
+    add(new RegExp(`(?<![\\d.,])\\d{1,3}(?:${S}\\d{3})+(?!\\d)`, 'gu'), (m) => m[0].replace(space, sep))
   }
   if (isSet(c.unitSpace) && c.units?.length) {
     add(new RegExp(`(?<=\\d)${S}+(?=(?:${words(c.units)})(?![\\p{L}\\p{N}'’]))`, 'gu'), c.unitSpace)

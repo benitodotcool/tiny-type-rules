@@ -221,3 +221,9 @@ test('no quadratic cliff on many scopes or long widow tails', () => {
     assert.ok(performance.now() - start < 300)
   }
 })
+
+test('thousands stay linear on huge numbers', () => {
+  const start = performance.now()
+  fixText('1' + ' 000'.repeat(20000), 'fr')
+  assert.ok(performance.now() - start < 100)
+})
