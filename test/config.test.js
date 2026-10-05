@@ -72,3 +72,10 @@ test('arrays replace, maps merge', () => {
   const typo = createTypo({ locales: { fr: { units: ['pc'], replacements: { '(r)': '®' } } } })
   assert.equal(typo.text('5 pc, 5 kg', 'fr'), nb('5~pc, 5 kg'))
 })
+
+test('non-breaking spaces of every width survive widows and a second pass', () => {
+  const typo = createTypo({ locales: { fr: { spaceBefore: { '!': ' ' }, widowSpace: ' ' } } })
+  const once = typo.text('Il finit par un cri !', 'fr')
+  assert.equal(once, nb('Il finit par un~cri !'))
+  assert.equal(typo.text(once, 'fr'), once)
+})

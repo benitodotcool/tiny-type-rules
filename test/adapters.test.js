@@ -93,3 +93,8 @@ test('fixElement works in place and respects ancestors', () => {
   fixElement(lone)
   assert.equal(lone.nodeValue, nb('Oui^!'))
 })
+
+test('rehype subpath exports the plugin as default', async () => {
+  const { default: plugin } = await import('../src/rehype.ts')
+  assert.equal(plugin, rehypeTinyTypeRules)
+})

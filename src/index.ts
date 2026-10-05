@@ -4,7 +4,7 @@ import { fixDomWith, fixHastWith, type DomNode, type HastNode } from './tree.ts'
 import { en } from './locales/en.ts'
 import { fr } from './locales/fr.ts'
 
-export { HAIR_SPACE, NBSP, NNBSP, THIN_SPACE, UNITS } from './chars.ts'
+export { FIGURE_SPACE, HAIR_SPACE, NBSP, NNBSP, THIN_SPACE, UNITS } from './chars.ts'
 export type { DomNode, HastNode, LocaleConfig }
 export { en, fr }
 

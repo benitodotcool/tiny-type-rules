@@ -2,6 +2,8 @@
 export const NBSP = ' '
 /** U+202F narrow no-break space: the French "espace fine insécable". */
 export const NNBSP = ' '
+/** U+2007 figure space: as wide as a digit, never wraps. */
+export const FIGURE_SPACE = '\u2007'
 /** U+2009 thin space. Breakable: wrap it in a rule only next to a non-breaking one. */
 export const THIN_SPACE = ' '
 /** U+200A hair space, the thinnest. Breakable. */

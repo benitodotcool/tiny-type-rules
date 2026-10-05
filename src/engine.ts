@@ -136,7 +136,7 @@ export function compile(c: LocaleConfig): (run: Run) => void {
   if (isSet(c.dash)) add(new RegExp(`(?<=\\S${S})--?(?=${S}\\S)`, 'gu'), c.dash)
   // Last, so the final word carries its punctuation (`cri !`); only breakable spaces are glued.
   if (isSet(c.widowSpace)) {
-    add(/(?<=\S)[ \t\u2000-\u200A\u205F]+(?=\S+(?:[\u00A0\u202F]+[^\s\p{L}\p{N}]+)*\s*$)/gu, c.widowSpace)
+    add(/(?<=\S)[ \t\u2000-\u2006\u2008-\u200A\u205F]+(?=\S+(?:[\u00A0\u2007\u202F]+[^\s\p{L}\p{N}]+)*\s*$)/gu, c.widowSpace)
   }
   return (run) => steps.forEach((step) => step(run))
 }
