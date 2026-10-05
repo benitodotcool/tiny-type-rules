@@ -96,9 +96,9 @@ fixHtml('<p>Il a dit : <em>"oui"</em> !</p>', 'fr')
 
 Rules see through inline tags (`a`, `em`, `strong`, `span`...) and comments, so `<em>oui</em> !` is fixed. Any other tag (`p`, `li`, `br`, `div`...) ends a run of text.
 
-Left untouched: tags, attributes, comments, and the content of `code`, `pre`, `kbd`, `samp`, `var`, `tt`, `script`, `style`, `textarea`, `svg` and `math`. Inline `code`, `kbd`, `samp`, `var` and `tt` count as a word: rules see around them (`"<code>npm</code>"` gets its guillemets) but never change them.
+Left untouched: tags, attributes, comments, and the content of `code`, `pre`, `kbd`, `samp`, `var`, `tt`, `script`, `style`, `textarea`, `template`, `svg` and `math`. Inline `code`, `kbd`, `samp`, `var` and `tt` count as a word: rules see around them (`"<code>npm</code>"` gets its guillemets) but never change them.
 
-The parser reads tags the way a browser does, stray quotes and unclosed `<p>` or `<li>` included. Entities are understood (`&nbsp;!` is fixed), text a rule leaves alone is written back exactly as it was, entities included, and no entity is ever decoded into a letter, a digit, `<`, `>`, `&` or `;`, so text can never turn into markup.
+The parser reads tags the way a browser does, stray quotes and optional end tags (`<p>`, `<li>`, `<td>`...) included. Entities are understood (`&nbsp;!`, `caf&eacute;`, `50 &euro;`), and text a rule leaves alone is written back exactly as it was, entities included. `&lt;` and `&amp;` are never decoded, and a `<` or `&` typed as text is escaped whenever its sentence changes, so text can never turn into markup.
 
 The `lang` attributes of the document win over the `locale` argument, which is the fallback. Without either, the HTML comes back unchanged:
 
