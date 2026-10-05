@@ -228,3 +228,8 @@ test('thousands stay linear on huge numbers', () => {
   createTypo({ locales: { fr: { thousandsSeparator: '\u202F' } } }).text('1' + ' 000'.repeat(20000), 'fr')
   assert.ok(performance.now() - start < 100)
 })
+
+test('widows count inline code as a word', () => {
+  const typo = createTypo({ locales: { fr: { widowSpace: ' ' } } })
+  assert.equal(typo.html('<p>Le titre : <code>npm i</code> !</p>', 'fr'), nb('<p>Le titre~:~<code>npm i</code>^!</p>'))
+})

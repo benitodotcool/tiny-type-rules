@@ -39,6 +39,10 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./react": {
+      "types": "./dist/react/index.d.ts",
+      "default": "./dist/react/index.js"
+    },
     "./rehype": {
       "types": "./dist/rehype.d.ts",
       "default": "./dist/rehype.js"
@@ -53,6 +57,14 @@
     "test": "node --test \"test/*.test.js\"",
     "check": "tsc --noEmit && npm test && npm run build && publint --strict && attw --pack --profile esm-only",
     "prepack": "npm run build"
+  },
+  "peerDependencies": {
+    "react": ">=18"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.5",

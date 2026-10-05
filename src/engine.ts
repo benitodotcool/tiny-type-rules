@@ -112,7 +112,8 @@ function lastWord(text: string): number {
     let start = i
     while (start && !space.test(text[start - 1]!)) start--
     if (start === i) return 0
-    const word = /[\p{L}\p{N}]/u.test(text.slice(start, i))
+    // U+FFFC stands for inline code or an unknown entity: a word too.
+    const word = /[\p{L}\p{N}\uFFFC]/u.test(text.slice(start, i))
     i = start
     while (i && space.test(text[i - 1]!)) i--
     if (!i) return 0
