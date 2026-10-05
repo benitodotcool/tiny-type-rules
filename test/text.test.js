@@ -31,6 +31,11 @@ const cases = {
     ['10 kg et 5 min', '10~kg et 5~min'],
     ['20 °C', '20~°C'],
     ['5 maisons', '5 maisons'],
+    ['Oui , non', 'Oui, non'],
+    ['M. Dupont et Mme Durand', 'M.~Dupont et Mme~Durand'],
+    ['le n° 5', 'le n°~5'],
+    ['Dommage. Me voilà', 'Dommage. Me~voilà'],
+    ['un tiret - ici', 'un tiret - ici'],
   ],
   en: [
     ['"Hello," she said.', '“Hello,” she said.'],
@@ -44,6 +49,8 @@ const cases = {
     ['Well...', 'Well…'],
     ['50 %', '50~%'],
     ['Four.... dots', 'Four.... dots'],
+    ['Mr. Smith, see p. 12', 'Mr.~Smith, see p.~12'],
+    ['group. Then', 'group. Then'],
   ],
 }
 

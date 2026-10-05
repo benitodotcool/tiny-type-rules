@@ -20,6 +20,15 @@ export interface LocaleConfig {
   /** Space between a number and one of `units`, replacing the typed space. */
   unitSpace?: false | string
   units?: readonly string[]
+  /** Space after one of `abbreviations` when a word or a number follows (`M. Dupont`, `n° 5`). */
+  abbreviationSpace?: false | string
+  abbreviations?: readonly string[]
+  /** Replaces a hyphen or a double hyphen typed between spaces (`a - b`, `a -- b`). */
+  dash?: false | string
+  /** Space before the last word of a paragraph, so that word never sits alone on its line. */
+  widowSpace?: false | string
+  /** Literal replacements applied before every other rule, such as `{ '(c)': '©' }`. */
+  replacements?: Readonly<Record<string, string>>
 }
 
 type Replacer = string | ((match: RegExpMatchArray) => string)
@@ -76,6 +85,9 @@ export function compile(c: LocaleConfig): (run: Run) => void {
   const steps: ((run: Run) => void)[] = []
   const add = (re: RegExp, rep: Replacer) => steps.push((run) => run.replace(re, rep))
   const q = c.quotes || undefined
+  const words = (list: readonly string[]) => [...list].sort((a, b) => b.length - a.length).map(esc).join('|')
+
+  for (const [from, to] of Object.entries(c.replacements ?? {})) if (from) add(new RegExp(esc(from), 'gu'), to)
 
   if (isSet(c.apostrophe)) {
     add(/(?<=[\p{L}\p{N}])'(?=\p{L})/gu, c.apostrophe)
@@ -115,8 +127,16 @@ export function compile(c: LocaleConfig): (run: Run) => void {
   }
   if (isSet(c.ellipsis)) add(/(?<!\.)\.\.\.(?!\.)/g, c.ellipsis)
   if (isSet(c.unitSpace) && c.units?.length) {
-    const units = [...c.units].sort((a, b) => b.length - a.length).map(esc).join('|')
-    add(new RegExp(`(?<=\\d)${S}+(?=(?:${units})(?![\\p{L}\\p{N}]))`, 'gu'), c.unitSpace)
+    add(new RegExp(`(?<=\\d)${S}+(?=(?:${words(c.units)})(?![\\p{L}\\p{N}]))`, 'gu'), c.unitSpace)
+  }
+  if (isSet(c.abbreviationSpace) && c.abbreviations?.length) {
+    const abbr = `(?<![\\p{L}\\p{N}])(?:${words(c.abbreviations)})`
+    add(new RegExp(`(?<=${abbr})${S}+(?=[\\p{L}\\p{N}])`, 'gu'), c.abbreviationSpace)
+  }
+  if (isSet(c.dash)) add(new RegExp(`(?<=\\S${S})--?(?=${S}\\S)`, 'gu'), c.dash)
+  // Last, so the final word carries its punctuation (`cri !`); only breakable spaces are glued.
+  if (isSet(c.widowSpace)) {
+    add(/(?<=\S)[ \t\u2000-\u200A\u205F]+(?=\S+(?:[\u00A0\u202F]+[^\s\p{L}\p{N}]+)*\s*$)/gu, c.widowSpace)
   }
   return (run) => steps.forEach((step) => step(run))
 }

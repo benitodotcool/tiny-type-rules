@@ -48,3 +48,27 @@ test('the default instance is not affected by custom ones', async () => {
   const { fixText } = await import('../src/index.ts')
   assert.equal(fixText('"Oui"', 'fr'), nb('«~Oui~»'))
 })
+
+test('opt-in settings: dash and replacements', () => {
+  const typo = createTypo({ locales: { fr: { dash: '–', replacements: { '(c)': '©', '->': '→' } } } })
+  assert.equal(typo.text('Il est - je crois - parti', 'fr'), 'Il est – je crois – parti')
+  assert.equal(typo.text('a -- b', 'fr'), 'a – b')
+  assert.equal(typo.text('pré-requis, -5, a-b', 'fr'), 'pré-requis, -5, a-b')
+  assert.equal(typo.text('(c) Brun Network -> ici', 'fr'), '© Brun Network → ici')
+})
+
+test('opt-in settings: widows', () => {
+  const typo = createTypo({ locales: { fr: { widowSpace: '\u00A0' } } })
+  assert.equal(typo.text('Un texte qui finit bien', 'fr'), nb('Un texte qui finit~bien'))
+  assert.equal(typo.text('Il finit par un cri !', 'fr'), nb('Il finit par un~cri^!'))
+  assert.equal(typo.text('Mot', 'fr'), 'Mot')
+  assert.equal(typo.text('Deux mots\n', 'fr'), nb('Deux~mots\n'))
+  assert.equal(typo.html('<p>Un deux trois</p><p>quatre <em>cinq</em></p>', 'fr'), nb('<p>Un deux~trois</p><p>quatre~<em>cinq</em></p>'))
+  const once = typo.text('Il finit par un cri !', 'fr')
+  assert.equal(typo.text(once, 'fr'), once)
+})
+
+test('arrays replace, maps merge', () => {
+  const typo = createTypo({ locales: { fr: { units: ['pc'], replacements: { '(r)': '®' } } } })
+  assert.equal(typo.text('5 pc, 5 kg', 'fr'), nb('5~pc, 5 kg'))
+})
