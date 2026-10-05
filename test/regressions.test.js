@@ -141,3 +141,83 @@ test('malformed HTML stays linear', () => {
     assert.ok(performance.now() - start < 500, html.slice(0, 10))
   }
 })
+
+test('inline end tags never close a p or li scope', () => {
+  const prevented = '<p data-prevent-ttr>Non <em>x</em> : "non" !</p>'
+  assert.equal(fixHtml(prevented, 'fr'), prevented)
+  assert.equal(
+    fixHtml('<div lang="fr"><p lang="en"><a href="#">Hi</a> "there" : ok !</p></div>'),
+    '<div lang="fr"><p lang="en"><a href="#">Hi</a> “there”: ok!</p></div>',
+  )
+  assert.equal(fixHtml('<div><p lang="en">Yes !</div> Oui !', 'fr'), nb('<div><p lang="en">Yes!</div> Oui^!'))
+})
+
+test('nested lists and other implied end tags', () => {
+  const html = '<ul><li data-prevent-ttr>Item !<ul><li>Sous !</li><li>Deux !</ul> fin !</li><li>Oui !</li></ul>'
+  assert.equal(fixHtml(html, 'fr'), nb('<ul><li data-prevent-ttr>Item !<ul><li>Sous !</li><li>Deux !</ul> fin !</li><li>Oui^!</li></ul>'))
+  assert.equal(fixHtml('<dl><dt lang="en">Term !<dd>Déf !</dl>', 'fr'), nb('<dl><dt lang="en">Term!<dd>Déf^!</dl>'))
+  assert.equal(fixHtml('<table><tr><td lang="en">A !<td>B !</table>', 'fr'), nb('<table><tr><td lang="en">A!<td>B^!</table>'))
+})
+
+test('letter entities are real letters to the rules', () => {
+  assert.equal(fixHtml("<p>The caf&eacute;'s menu</p>", 'en'), '<p>The café’s menu</p>')
+  assert.equal(fixHtml('<p>50 &euro; et M. &Eacute;mile</p>', 'fr'), nb('<p>50~€ et M.~Émile</p>'))
+  assert.equal(fixHtml('<p>a &lt; b !</p>', 'fr'), nb('<p>a &lt; b^!</p>'))
+  assert.equal(fixHtml('<p>Tom &amp; Jerry !</p>', 'fr'), nb('<p>Tom &amp; Jerry^!</p>'))
+})
+
+test('template content is left alone, as DOM and hast do', () => {
+  assert.equal(fixHtml('<template><p>Oui !</p></template>', 'fr'), '<template><p>Oui !</p></template>')
+})
+
+test('MDX elements named like code elements are skipped', () => {
+  const jsx = (name, value, type = 'mdxJsxFlowElement') => ({ type, name, attributes: [], children: [{ type: 'text', value }] })
+  const tree = {
+    type: 'root',
+    children: [
+      jsx('pre', 'a : b !'),
+      jsx('code', 'npm : "x"', 'mdxJsxTextElement'),
+      jsx('svg', 'Oui !'),
+      jsx('p', 'Oui !'),
+      { type: 'mdxJsxFlowElement', name: 'Note', attributes: [{ type: 'mdxJsxAttribute', name: 'lang', value: { type: 'mdxJsxAttributeValueExpression', value: 'x' } }], children: [{ type: 'text', value: 'Oui !' }] },
+    ],
+  }
+  rehypeTinyTypeRules({ locale: 'fr' })(tree)
+  assert.deepEqual(tree.children.map((n) => n.children[0].value), ['a : b !', 'npm : "x"', 'Oui !', nb('Oui^!'), nb('Oui^!')])
+})
+
+test('inches after a number stay straight', () => {
+  assert.equal(fixText('un écran 27" !', 'fr'), nb('un écran 27"^!'))
+  assert.equal(fixText('He is 5\'11"', 'en'), 'He is 5’11"')
+  assert.equal(fixText('"Le 27" est grand"', 'fr'), nb('«~Le 27~» est grand~»'))
+})
+
+test('fixParts tolerates missing input', () => {
+  assert.equal(fixParts(null, 'fr'), null)
+  assert.deepEqual(fixParts(['Oui', null, ' !'], 'fr'), ['Oui', null, nb('^!')])
+})
+
+test('an explicit undefined setting keeps the built-in one', () => {
+  assert.equal(createTypo({ locales: { fr: { quotes: undefined } } }).text('"Oui"', 'fr'), nb('«~Oui~»'))
+})
+
+test('Portable Text keeps unchanged blocks and spans as they are', () => {
+  const blocks = [{ _type: 'block', children: [{ _type: 'span', text: 'Rien' }] }, { _type: 'block', children: [{ _type: 'span', text: 'Oui ! ' }, { _type: 'span', text: 'Rien' }] }]
+  const out = fixPortableText(blocks, 'fr')
+  assert.equal(out[0], blocks[0])
+  assert.notEqual(out[1], blocks[1])
+  assert.equal(out[1].children[1], blocks[1].children[1])
+})
+
+test('no quadratic cliff on many scopes or long widow tails', () => {
+  const typo = createTypo({ locales: { fr: { widowSpace: ' ' } } })
+  for (const run of [
+    () => fixHtml('<span lang="fr"></span>'.repeat(8000), 'fr'),
+    () => typo.text('a' + ' !'.repeat(8000), 'fr'),
+    () => typo.text('x '.repeat(4) + 'a'.repeat(8000), 'fr'),
+  ]) {
+    const start = performance.now()
+    run()
+    assert.ok(performance.now() - start < 300)
+  }
+})

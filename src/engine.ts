@@ -46,8 +46,10 @@ export class Run {
     this.marks = marks
   }
 
-  replace(re: RegExp, rep: Replacer): void {
+  /** Replaces every match of a global regex, starting at `from`. */
+  replace(re: RegExp, rep: Replacer, from = 0): void {
     const { text, marks } = this
+    re.lastIndex = from
     let out = ''
     let last = 0
     let i = 0
@@ -98,6 +100,26 @@ function opens(m: RegExpMatchArray, depth: number): boolean {
   return before === after ? depth === 0 : before
 }
 
+/**
+ * Start of the spaces before the last word that has a letter or a digit, the words made of
+ * punctuation after it included (`fin …`). 0 when there is nothing to glue. Linear.
+ */
+function lastWord(text: string): number {
+  const space = /\s/
+  let i = text.length
+  while (i && space.test(text[i - 1]!)) i--
+  for (;;) {
+    let start = i
+    while (start && !space.test(text[start - 1]!)) start--
+    if (start === i) return 0
+    const word = /[\p{L}\p{N}]/u.test(text.slice(start, i))
+    i = start
+    while (i && space.test(text[i - 1]!)) i--
+    if (!i) return 0
+    if (word) return i
+  }
+}
+
 /** Turns a locale config into the function that applies it. */
 export function compile(c: LocaleConfig): (run: Run) => void {
   const steps: ((run: Run) => void)[] = []
@@ -111,7 +133,7 @@ export function compile(c: LocaleConfig): (run: Run) => void {
   if (isSet(c.ellipsis)) add(/(?<!\.)\.\.\.(?!\.)/g, c.ellipsis)
 
   if (isSet(c.apostrophe)) {
-    add(/(?<=[\p{L}\p{N}])'(?=\p{L})/gu, c.apostrophe)
+    add(/(?<=[\p{L}\p{N}])'(?=[\p{L}\p{N}])/gu, c.apostrophe, "'")
     add(/(?<=^|[\s(])'(?=\d\ds?\b)/g, c.apostrophe)
   }
   if (q || c.singleQuotes || isSet(c.apostrophe)) {
@@ -130,6 +152,8 @@ export function compile(c: LocaleConfig): (run: Run) => void {
         if (ch !== '"') return (depth = ch === q![0] ? depth + 1 : Math.max(0, depth - 1)), ch
         if (!q) return ch
         if (opens(m, depth)) return q[depth++ ? 2 : 0]
+        // An unmatched closing quote right after a digit is an inch mark: `27"`.
+        if (!depth && /\d/.test(m.input![m.index! - 1] ?? '')) return ch
         depth = Math.max(0, depth - 1)
         return q[depth ? 3 : 1]
       })
@@ -161,9 +185,13 @@ export function compile(c: LocaleConfig): (run: Run) => void {
   if (isSet(c.dash)) add(new RegExp(`(?<=\\S${S})--?(?=${S}\\S)`, 'gu'), c.dash)
   // Last, so the final word carries the punctuation after it (`cri !`, `fin …`).
   if (isSet(c.widowSpace)) {
-    const tail = '(?:\\s+[^\\s\\p{L}\\p{N}]+)*\\s*$'
-    add(new RegExp(`(?<=\\S)${BREAKABLE}+(?=[^\\s\\p{L}\\p{N}]+${tail})`, 'gu'), c.widowSpace)
-    add(new RegExp(`(?<=\\S)${BREAKABLE}+(?=\\S*[\\p{L}\\p{N}]\\S*${tail})`, 'gu'), c.widowSpace)
+    const space = c.widowSpace
+    const re = new RegExp(`${BREAKABLE}+`, 'gu')
+    steps.push((run) => {
+      const from = lastWord(run.text)
+      const end = run.text.trimEnd().length
+      if (from > 0) run.replace(re, (m) => (m.index! < end ? space : m[0]), from)
+    })
   }
   return (run) => steps.forEach((step) => step(run))
 }

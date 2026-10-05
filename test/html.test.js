@@ -59,7 +59,7 @@ test('entities', () => {
   assert.equal(fr('Oui&nbsp;!'), nb('Oui^!'))
   assert.equal(fr('&quot;Oui&quot;'), nb('«~Oui~»'))
   assert.equal(fr('Tom &amp; Jerry ; a &lt; b !'), nb('Tom &amp; Jerry^; a &lt; b^!'))
-  assert.equal(fr('&#60;b&#62; !'), nb('&#60;b&#62;^!'))
+  assert.equal(fr('&#60;b&#62; !'), nb('&#60;b>^!'))
   assert.equal(fixHtml('<p lang="de">a&nbsp;!</p>', 'fr'), '<p lang="de">a&nbsp;!</p>')
 })
 
@@ -74,4 +74,16 @@ test('handles odd markup without throwing', () => {
 test('idempotent', () => {
   const html = '<p>"<em>Bonjour</em>" : oui !</p><p lang="en">"Hi", it\'s me !</p>'
   assert.equal(fr(fr(html)), fr(html))
+})
+
+test('markup comes out exactly as it went in', () => {
+  const tags = (html) => html.match(/<[^>]*>?/g) ?? []
+  const docs = [
+    '<ul><li data-prevent-ttr>Item !<ul><li>Sous !</li><li>Deux !</ul> fin !</li><li>Oui !</li></ul>',
+    '<dl><dt lang="en">T !<dd>D !<dt>T2 !</dl><table><tr><td lang="en">A !<td>B !<tr><td>C !</table>',
+    '<p lang="en">a <em>b</em> !<p>c !<div>d !</div><select><option lang="en">x !<option>y !</select>',
+    '<p data-prevent-ttr>Non <a href="#">x</a> : "non" !</p><template><p>t !</p></template><!-->x !<!-- y -->',
+    '<div lang="en"><div/>Yes !</div>Yes !</div><svg><path d="M0 0"/><text>a !</text></svg><p>&#60;b&#62; &amp; &lt;i&gt; !</p>',
+  ]
+  for (const html of docs) for (const locale of ['fr', 'en']) assert.deepEqual(tags(fixHtml(html, locale)), tags(html), html)
 })

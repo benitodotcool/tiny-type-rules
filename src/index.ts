@@ -39,7 +39,7 @@ export interface Typo {
    * Fixes the text nodes of a live DOM element in place, browser side. Ancestors count:
    * their `lang` and `data-*` attributes apply as in `html`.
    */
-  element(root: DomNode, locale?: string): void
+  element(root: DomNode | null | undefined, locale?: string): void
   /** Fixes a hast tree (rehype, MDX) in place, with the same rules as `html`. */
   hast(tree: HastNode, locale?: string): void
 }
@@ -65,9 +65,11 @@ function lookup<T>(map: Map<string, T>, tag: string): T | undefined {
   }
 }
 
+const defined = (config: LocaleConfig) => Object.fromEntries(Object.entries(config).filter(([, v]) => v !== undefined))
+
 const merge = (base: LocaleConfig = {}, over: LocaleConfig): LocaleConfig => ({
   ...base,
-  ...over,
+  ...defined(over),
   spaceBefore: { ...base.spaceBefore, ...over.spaceBefore },
   replacements: { ...base.replacements, ...over.replacements },
 })
@@ -96,7 +98,11 @@ export function createTypo(options: TypoOptions = {}): Typo {
 
   return {
     text: (text, locale) => (typeof text === 'string' ? (fix([text], locale)?.[0] ?? text) : text),
-    parts: (parts, locale) => (parts.length && fix(parts, locale)) || [...parts],
+    parts: (parts, locale) => {
+      if (!Array.isArray(parts) || !parts.length) return parts as never
+      const fixed = fix(parts.map((p) => (typeof p === 'string' ? p : OPAQUE)), locale)
+      return parts.map((p, i) => (typeof p === 'string' && fixed ? fixed[i]! : p))
+    },
     html: (html, locale) => (typeof html === 'string' ? fixHtmlWith(fix, html, locale) : html),
     portableText: (blocks, locale) =>
       !Array.isArray(blocks)
@@ -110,8 +116,11 @@ export function createTypo(options: TypoOptions = {}): Typo {
               children.map((c: Span) => (isText(c) ? (c.text as string) : OPAQUE)),
               locale,
             )
-            if (!fixed) return block
-            return { ...block, children: children.map((c: Span, i) => (isText(c) ? { ...c, text: fixed[i] } : c)) }
+            if (!fixed || children.every((c: Span, i) => !isText(c) || c.text === fixed[i])) return block
+            return {
+              ...block,
+              children: children.map((c: Span, i) => (isText(c) && c.text !== fixed[i] ? { ...c, text: fixed[i] } : c)),
+            }
           }),
     element: (root, locale) => fixDomWith(fix, root, locale),
     hast: (tree, locale) => fixHastWith(fix, tree, locale),

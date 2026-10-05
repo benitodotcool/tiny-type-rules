@@ -5,7 +5,7 @@ export const INLINE = new Set(
   ),
 )
 /** Elements whose content is never fixed, unless they carry `data-ttr`. */
-export const SKIP = new Set('code kbd math pre samp script style svg textarea tt var'.split(' '))
+export const SKIP = new Set('code kbd math pre samp script style svg template textarea tt var'.split(' '))
 
 /** Stands for content the rules must see around but never change: inline code, unknown entities. */
 export const OPAQUE = '￼'

@@ -10,7 +10,7 @@ interface Adapter<N> {
   setText(node: N, text: string): void
   tag(node: N): string
   attr(node: N, name: string): string | null
-  children(node: N): Iterable<N> | undefined
+  children(node: N): ArrayLike<N> | undefined
 }
 
 /** Fixes the text nodes of a tree in place, with the same scoping as the HTML parser. */
@@ -20,13 +20,15 @@ function fixTree<N>(a: Adapter<N>, fix: FixParts, root: N, scope: Scope): void {
   let runScope = scope
   let before = ''
 
-  const firstChar = (list: N[]): string => {
-    for (const node of list) {
+  // Bounded, so many empty scopes in a row stay linear.
+  const firstChar = (list: readonly N[], from = 0, budget = { n: 16 }): string => {
+    for (let i = from; i < list.length && budget.n-- > 0; i++) {
+      const node = list[i]!
       const kind = a.kind(node)
       if (kind === 'text' && a.text(node)) return a.text(node)[0]!
       if (kind === 'opaque') return OPAQUE
       if (kind === 'element') {
-        const found = firstChar([...(a.children(node) ?? [])])
+        const found = firstChar(Array.from(a.children(node) ?? []), 0, budget)
         if (found) return found
       }
     }
@@ -47,7 +49,7 @@ function fixTree<N>(a: Adapter<N>, fix: FixParts, root: N, scope: Scope): void {
   }
 
   const walk = (node: N, scope: Scope) => {
-    const children = [...(a.children(node) ?? [])]
+    const children = Array.from(a.children(node) ?? [])
     children.forEach((child, i) => {
       const kind = a.kind(child)
       if (kind === 'text') return add(child, a.text(child), scope)
@@ -66,7 +68,7 @@ function fixTree<N>(a: Adapter<N>, fix: FixParts, root: N, scope: Scope): void {
       flush(inline ? firstChar([child]) : '')
       if (!inline) before = ''
       walk(child, inner)
-      flush(inline ? firstChar(children.slice(i + 1)) : '')
+      flush(inline ? firstChar(children, i + 1) : '')
       if (!inline) before = ''
     })
   }
@@ -80,7 +82,7 @@ const base = (locale: string | undefined): Scope => ({ name: '', depth: 0, skip:
 export interface DomNode {
   readonly nodeType: number
   nodeValue: string | null
-  readonly childNodes: Iterable<DomNode>
+  readonly childNodes: ArrayLike<DomNode>
   readonly parentElement: DomNode | null
   readonly localName?: string
   getAttribute?(name: string): string | null
@@ -95,7 +97,8 @@ const dom: Adapter<DomNode> = {
   children: (n) => n.childNodes,
 }
 
-export function fixDomWith(fix: FixParts, root: DomNode, locale?: string): void {
+export function fixDomWith(fix: FixParts, root: DomNode | null | undefined, locale?: string): void {
+  if (!root) return
   const chain: DomNode[] = []
   for (let n = root.parentElement; n; n = n.parentElement) chain.unshift(n)
   const scope = chain.reduce((s, el) => enter(dom.tag(el), (name) => dom.attr(el, name), s) ?? s, base(locale))
@@ -124,7 +127,15 @@ const hast: Adapter<HastNode> = {
   },
   text: (n) => n.value ?? '',
   setText: (n, text) => void (n.value = text),
-  tag: (n) => (n.type === 'element' ? n.tagName! : n.type === 'mdxJsxTextElement' ? 'span' : 'div'),
+  // An MDX element named like an HTML one (`<pre>`) is that element; a component is a span or a div.
+  tag: (n) =>
+    n.type === 'element'
+      ? n.tagName!
+      : n.name && /^[a-z]/.test(n.name)
+        ? n.name
+        : n.type === 'mdxJsxTextElement'
+          ? 'span'
+          : 'div',
   attr: (n, name) => {
     if (n.properties) {
       const v = n.properties[camel(name)]
@@ -133,7 +144,8 @@ const hast: Adapter<HastNode> = {
     const a = n.attributes?.find((a) => a.type === 'mdxJsxAttribute' && a.name === name)
     if (!a) return null
     if (typeof a.value === 'string') return a.value
-    // `{false}` written as an MDX expression turns the attribute off.
+    // An expression value is unknown here: no language, and `{false}` turns a flag off.
+    if (name.endsWith('lang') && a.value) return null
     return (a.value as { value?: unknown } | null)?.value === 'false' ? null : ''
   },
   children: (n) => n.children,

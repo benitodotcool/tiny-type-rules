@@ -2,7 +2,7 @@ import { NBSP, NNBSP, UNITS } from '../chars.ts'
 import type { LocaleConfig } from '../engine.ts'
 
 /** French, after the Lexique des règles typographiques en usage à l'Imprimerie nationale. */
-export const fr: LocaleConfig = {
+export const fr = {
   quotes: ['«', '»', '“', '”'],
   singleQuotes: false,
   apostrophe: '’',
@@ -17,4 +17,4 @@ export const fr: LocaleConfig = {
   dash: false,
   widowSpace: false,
   replacements: {},
-}
+} satisfies LocaleConfig

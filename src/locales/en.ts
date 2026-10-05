@@ -2,7 +2,7 @@ import { NBSP, UNITS } from '../chars.ts'
 import type { LocaleConfig } from '../engine.ts'
 
 /** English, US and UK alike: double quotes first, no space before punctuation. */
-export const en: LocaleConfig = {
+export const en = {
   quotes: ['“', '”', '‘', '’'],
   singleQuotes: ['‘', '’'],
   apostrophe: '’',
@@ -17,4 +17,4 @@ export const en: LocaleConfig = {
   dash: false,
   widowSpace: false,
   replacements: {},
-}
+} satisfies LocaleConfig

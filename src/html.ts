@@ -3,41 +3,53 @@ import { enter, INLINE, OPAQUE, SKIP, type FixParts, type Scope } from './scope.
 const VOID = new Set('area base br col embed hr img input link meta param source track wbr'.split(' '))
 // Raw text elements: their content is never parsed nor fixed.
 const RAW = new Set('iframe noembed noframes plaintext script style textarea xmp'.split(' '))
-// A start tag of one of these closes an open `p`.
-const CLOSES_P = new Set(
-  'address article aside blockquote details dialog div dl fieldset figcaption figure footer form h1 h2 h3 h4 h5 h6 header hgroup hr main menu nav ol p pre section table ul'.split(
-    ' ',
-  ),
-)
-// Names are case-sensitive; a few legacy ones also work without their semicolon.
-const ENTITY = /&(?:#(\d+);?|#[xX]([\da-fA-F]+);?|(nbsp|quot|laquo|raquo)(?![a-zA-Z\d]*;)|([a-zA-Z][a-zA-Z\d]*);)/y
-const NAMED: Record<string, string> = {
-  nbsp: ' ',
-  quot: '"',
-  apos: "'",
-  hellip: '…',
-  laquo: '«',
-  raquo: '»',
-  lsquo: '‘',
-  rsquo: '’',
-  ldquo: '“',
-  rdquo: '”',
-  ndash: '–',
-  mdash: '—',
-  thinsp: ' ',
+// Elements whose end tag is optional: the start tags and end tags that close them implicitly,
+// and the containers that shield them from both (a list nested in an `li`).
+const BLOCKS =
+  'address article aside blockquote details dialog div dl fieldset figcaption figure footer form h1 h2 h3 h4 h5 h6 header hgroup hr main menu nav ol p pre section table ul'
+const AUTO: Record<string, { starts: Set<string>; ends: Set<string>; shields: Set<string> }> = {}
+for (const [names, starts, ends, shields] of [
+  ['p', BLOCKS, BLOCKS.replace(/\bp\b/, '') + ' body li dd dt td th', ''],
+  ['li', 'li', 'ul ol menu body', 'ul ol menu'],
+  ['dt dd', 'dt dd', 'dl body', 'dl'],
+  ['td th', 'td th tr tbody thead tfoot', 'tr tbody thead tfoot table body', 'table'],
+  ['tr', 'tr tbody thead tfoot', 'tbody thead tfoot table body', 'table'],
+  ['option', 'option optgroup', 'select datalist optgroup body', ''],
+] as const) {
+  const set = (list: string) => new Set(list.split(' ').filter(Boolean))
+  for (const name of names.split(' ')) AUTO[name] = { starts: set(starts), ends: set(ends), shields: set(shields) }
 }
-// A decoded character must not be able to rebuild a tag or an entity with its neighbours.
-const SAFE = /^[^\p{L}\p{N}\p{Cc}\p{Cs}<>&;#=]$/u
 
+// Names are case-sensitive; a few legacy ones also work without their semicolon.
+const ENTITY = /&(?:#(\d+);?|#[xX]([\da-fA-F]+);?|(nbsp|quot|laquo|raquo|copy|reg|deg|amp|lt|gt)(?![a-zA-Z\d]*;)|([a-zA-Z][a-zA-Z\d]*);)/y
+// Latin-1 (U+00A0 to U+00FF) in code point order, then the typographic entities.
+const LATIN1 =
+  'nbsp iexcl cent pound curren yen brvbar sect uml copy ordf laquo not shy reg macr deg plusmn sup2 sup3 acute micro para middot cedil sup1 ordm raquo frac14 frac12 frac34 iquest Agrave Aacute Acirc Atilde Auml Aring AElig Ccedil Egrave Eacute Ecirc Euml Igrave Iacute Icirc Iuml ETH Ntilde Ograve Oacute Ocirc Otilde Ouml times Oslash Ugrave Uacute Ucirc Uuml Yacute THORN szlig agrave aacute acirc atilde auml aring aelig ccedil egrave eacute ecirc euml igrave iacute icirc iuml eth ntilde ograve oacute ocirc otilde ouml divide oslash ugrave uacute ucirc uuml yacute thorn yuml'
+const NAMED = new Map<string, string>([
+  ...LATIN1.split(' ').map((name, i) => [name, String.fromCharCode(0xa0 + i)] as const),
+  ...Object.entries({
+    gt: '>', quot: '"', apos: "'",
+    OElig: 'Œ', oelig: 'œ', Scaron: 'Š', scaron: 'š', Yuml: 'Ÿ', euro: '€', trade: '™',
+    ensp: '\u2002', emsp: '\u2003', thinsp: '\u2009', hairsp: '\u200A', ndash: '–', mdash: '—', minus: '−',
+    lsquo: '‘', rsquo: '’', sbquo: '‚', ldquo: '“', rdquo: '”', bdquo: '„', lsaquo: '‹', rsaquo: '›',
+    hellip: '…', bull: '•', prime: '′', Prime: '″', permil: '‰', larr: '←', rarr: '→',
+  }),
+])
+
+/** Decodes a character reference; undefined for `<`, `&`, an unknown name or a control character. */
 function decode(m: RegExpExecArray): string | undefined {
   const [, dec, hex, legacy, name] = m
   const named = legacy ?? name
-  if (named) return Object.hasOwn(NAMED, named) ? NAMED[named] : undefined
+  if (named) return NAMED.get(named)
   const code = dec ? Number(dec) : parseInt(hex!, 16)
   if (!(code <= 0x10ffff)) return undefined
   const char = String.fromCodePoint(code)
-  return SAFE.test(char) ? char : undefined
+  return /^[^\p{Cc}\p{Cs}<&]$/u.test(char) ? char : undefined
 }
+
+// `<` and `&` typed as text are opaque, and escaped when their run changes, so decoded
+// characters next to them can never form a tag or an entity.
+const SAFE: Record<string, string> = { '<': '&lt;', '&': '&amp;' }
 
 const TAG_NAME = /[a-zA-Z][^\s/>]*/y
 const ATTRIBUTE = /[\s/]+|([^\s/>][^\s/>=]*)(?:\s*=\s*(?:"([^"]*)"?|'([^']*)'?|([^\s>]*)))?/y
@@ -69,12 +81,13 @@ function endOf(html: string, name: string, i: number): number {
 
 /** First text character from `i` on, skipping tags. */
 function peek(html: string, i: number): string {
-  while (html[i] === '<' && /[a-zA-Z/!?]/.test(html[i + 1] ?? '')) {
+  // Bounded, so a long series of empty scopes stays linear.
+  for (let n = 0; n < 8 && html[i] === '<' && /[a-zA-Z/!?]/.test(html[i + 1] ?? ''); n++) {
     const end = html.indexOf('>', i)
     if (end < 0) return ''
     i = end + 1
   }
-  return html[i] ?? ''
+  return html[i] === '<' ? '' : (html[i] ?? '')
 }
 
 /**
@@ -96,7 +109,7 @@ export function fixHtmlWith(fix: FixParts, html: string, locale?: string): strin
     parts.forEach((part, i) => {
       if (i) out += glue[i - 1]
       const text = fixed?.[i] ?? part
-      out += text === part ? raws[i] : opaque[i] ? text.replaceAll(OPAQUE, raws[i]!) : text
+      out += text === part ? raws[i] : opaque[i] ? text.replaceAll(OPAQUE, SAFE[raws[i]!] ?? raws[i]!) : text
     })
     before = (fixed ?? parts).join('').slice(-1) || before
     parts = ['']
@@ -143,7 +156,7 @@ export function fixHtmlWith(fix: FixParts, html: string, locale?: string): strin
       ENTITY.lastIndex = i
       const m = ENTITY.exec(html)
       if (!m) {
-        text('&')
+        opaquePiece('&')
         i++
         continue
       }
@@ -173,15 +186,18 @@ export function fixHtmlWith(fix: FixParts, html: string, locale?: string): strin
       const name = /^<\/([^\s/>]+)/.exec(token)![1]!.toLowerCase()
       i = stop
       let top = scopes.at(-1)!
-      while (top.name !== name && (top.name === 'p' || top.name === 'li') && !top.depth) {
+      while (AUTO[top.name]?.ends.has(name) && !top.depth) {
         pop()
         top = scopes.at(-1)!
       }
-      if (top.name === name && !top.depth) {
+      if (AUTO[top.name]?.shields.has(name) && top.depth) {
+        top.depth--
+        block(token)
+      } else if (top.name === name && !top.depth) {
         pop(INLINE.has(name) ? peek(html, i) : '')
         out += token
       } else {
-        if (top.name === name) top.depth--
+        if (top.name === name && !AUTO[name]) top.depth--
         if (INLINE.has(name)) split(token)
         else block(token)
       }
@@ -194,10 +210,12 @@ export function fixHtmlWith(fix: FixParts, html: string, locale?: string): strin
       const token = html.slice(i, tag.end)
       i = tag.end
       let top = scopes.at(-1)!
-      if (((CLOSES_P.has(tag.name) && top.name === 'p') || (tag.name === 'li' && top.name === 'li')) && !top.depth) {
+      while (AUTO[top.name]?.starts.has(tag.name) && !top.depth) {
         pop()
         top = scopes.at(-1)!
       }
+      // In an element with an optional end tag, `depth` counts the shielding containers instead.
+      if (AUTO[top.name]?.shields.has(tag.name)) top.depth++
       if (RAW.has(tag.name)) {
         const stop = tag.name === 'plaintext' ? html.length : endOf(html, tag.name, i)
         block(token + html.slice(i, stop))
@@ -219,12 +237,12 @@ export function fixHtmlWith(fix: FixParts, html: string, locale?: string): strin
         scopes.push(scope)
         out += token
       } else {
-        if (opens && top.name === tag.name) top.depth++
+        if (opens && top.name === tag.name && !AUTO[tag.name]) top.depth++
         if (INLINE.has(tag.name)) split(token)
         else block(token)
       }
     } else {
-      text('<')
+      opaquePiece('<')
       i++
     }
   }
