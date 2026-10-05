@@ -1,5 +1,6 @@
 'use client'
 
+import * as React from 'react'
 import { createContext, createElement, useContext, useEffect, useMemo, type ReactNode } from 'react'
 
 import type { Typo } from '../index.ts'
@@ -29,3 +30,17 @@ export function TTRClientProvider({ children, locale, locales, auto = false }: T
 
 /** The fixer of the nearest `TTRProvider`, for text the JSX runtime does not see (attributes, metadata). */
 export const useTTR = (): Typo => fixerFor(useContext(TTRContext) ?? undefined)
+
+type Internals = { H?: unknown } | undefined
+const internals = (React as unknown as Record<string, Internals>).__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE
+
+/** Settings of the nearest provider while a component renders; none outside a render. */
+export function clientSettings(): Settings | undefined {
+  // `use` may run conditionally, but only during a render: check React is rendering first.
+  if (internals && !internals.H) return undefined
+  try {
+    return React.use(TTRContext) ?? undefined
+  } catch {
+    return undefined
+  }
+}

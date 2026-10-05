@@ -1,5 +1,6 @@
 import { getCurrentInstance, hasInjectionContext, inject, toDisplayString, type App, type InjectionKey } from 'vue'
 
+import { cachedParts, cachedValue } from '../cache.ts'
 import { createTypo, type Typo, type TypoOptions } from '../index.ts'
 import { OPAQUE, SKIP } from '../scope.ts'
 import type { DomNode } from '../tree.ts'
@@ -21,13 +22,6 @@ type Scope = { skip: boolean; locale?: string }
 type Props = Record<string, unknown> | null | undefined
 
 const has = (props: Props, name: string) => props != null && name in props && props[name] !== false
-const portableTexts = new WeakMap<object, Map<string, unknown>>()
-const isPortableText = (value: unknown): value is unknown[] =>
-  Array.isArray(value) &&
-  value.some(
-    (block) => (block as { _type?: unknown } | null)?._type === 'block' && Array.isArray((block as { children?: unknown }).children),
-  )
-
 /** Scope set on the components around the current render (`<Card lang="en">`), innermost first. */
 function runtimeScope(fallback: string | undefined): Scope {
   for (let instance = getCurrentInstance(); instance; instance = instance.parent) {
@@ -49,7 +43,6 @@ export const TTRPlugin = {
     const scope = (local?: string): Scope =>
       local === '+' ? { skip: false, locale: current() } : local ? { skip: false, locale: local } : runtimeScope(current())
 
-    const results = new Map<string, string[]>()
     // Interpolated objects and arrays render as JSON: a word to the rules, left as is.
     const isText = (piece: unknown) => typeof piece === 'string' || typeof piece === 'number'
     app.config.globalProperties.$ttr = (pieces: unknown[], index: number, local?: string) => {
@@ -57,26 +50,15 @@ export const TTRPlugin = {
       const { skip, locale } = scope(local)
       if (skip || !locale || !isText(piece)) return toDisplayString(piece)
       const texts = pieces.map((p) => (p == null ? '' : isText(p) ? String(p) : OPAQUE))
-      const key = `${locale}\u0000${texts.join('\u0001')}`
-      let fixed = results.get(key)
-      if (!fixed) {
-        if (results.size > 2000) results.clear()
-        results.set(key, (fixed = fixer.parts(texts, locale)))
-      }
-      return fixed[index]
+      return cachedParts(fixer, texts, locale)[index]
     }
     app.config.globalProperties.$ttrHtml = (html: unknown, local?: string) => {
       const { skip, locale } = scope(local)
       return skip || !locale || typeof html !== 'string' ? html : fixer.html(html, locale)
     }
     app.config.globalProperties.$ttrValue = (value: unknown, local?: string) => {
-      if (!isPortableText(value)) return value
       const { skip, locale } = scope(local)
-      if (skip || !locale) return value
-      let cache = portableTexts.get(value)
-      if (!cache) portableTexts.set(value, (cache = new Map()))
-      if (!cache.has(locale)) cache.set(locale, fixer.portableText(value, locale))
-      return cache.get(locale)
+      return skip || !locale ? value : cachedValue(fixer, value, locale)
     }
 
     const bound = Object.fromEntries(

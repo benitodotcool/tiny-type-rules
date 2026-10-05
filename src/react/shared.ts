@@ -1,3 +1,4 @@
+import { cachedParts, cachedValue } from '../cache.ts'
 import { createTypo, type Typo, type TypoOptions } from '../index.ts'
 import { enter, OPAQUE, type Scope } from '../scope.ts'
 
@@ -17,25 +18,6 @@ export function fixerFor(settings: Settings | undefined): Typo {
   return typo
 }
 
-// The same text renders again and again: remember the last results.
-const results = new Map<string, string[]>()
-function fixParts(typo: Typo, parts: string[], locale: string): string[] {
-  const key = `${locale}\u0000${parts.join('\u0001')}`
-  let fixed = results.get(key)
-  if (!fixed) {
-    if (results.size > 2000) results.clear()
-    results.set(key, (fixed = typo.parts(parts, locale)))
-  }
-  return fixed
-}
-
-const portableTexts = new WeakMap<object, Map<string, unknown>>()
-const isPortableText = (value: unknown): value is unknown[] =>
-  Array.isArray(value) &&
-  value.some(
-    (block) => (block as { _type?: unknown } | null)?._type === 'block' && Array.isArray((block as { children?: unknown }).children),
-  )
-
 const isElement = (node: unknown): node is object => typeof node === 'object' && node !== null && '$$typeof' in node
 
 function fixChildren(typo: Typo, children: unknown, locale: string): unknown {
@@ -47,7 +29,7 @@ function fixChildren(typo: Typo, children: unknown, locale: string): unknown {
   }
   collect(children)
   if (parts.every((part) => part === OPAQUE)) return children
-  const fixed = fixParts(typo, parts, locale)
+  const fixed = cachedParts(typo, parts, locale)
   let i = 0
   let changed = false
   const rebuild = (node: unknown): unknown => {
@@ -74,12 +56,8 @@ function fixProps(settings: Settings | undefined, type: unknown, props: Props, s
   if (typeof type === 'string' && typeof html?.__html === 'string') {
     out = { ...out, dangerouslySetInnerHTML: { __html: typo.html(html.__html, locale) } }
   }
-  if (isPortableText(props.value)) {
-    let cache = portableTexts.get(props.value)
-    if (!cache) portableTexts.set(props.value, (cache = new Map()))
-    if (!cache.has(locale)) cache.set(locale, typo.portableText(props.value, locale))
-    out = { ...out, value: cache.get(locale) }
-  }
+  const value = cachedValue(typo, props.value, locale)
+  if (value !== props.value) out = { ...out, value }
   const children = props.children
   if (children != null && typeof children !== 'function') {
     const fixed = fixChildren(typo, children, locale)

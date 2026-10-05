@@ -1,6 +1,6 @@
 import { Fragment, jsxDEV as reactJsxDEV } from 'react/jsx-dev-runtime'
 
-import { clientSettings } from './dispatcher.ts'
+import { clientSettings } from './context.ts'
 import { build } from './shared.ts'
 
 export { Fragment }
