@@ -43,6 +43,14 @@
       "types": "./dist/react/index.d.ts",
       "default": "./dist/react/index.js"
     },
+    "./vue": {
+      "types": "./dist/vue/index.d.ts",
+      "default": "./dist/vue/index.js"
+    },
+    "./nuxt": {
+      "types": "./dist/nuxt/module.d.ts",
+      "default": "./dist/nuxt/module.js"
+    },
     "./rehype": {
       "types": "./dist/rehype.d.ts",
       "default": "./dist/rehype.js"
@@ -59,10 +67,18 @@
     "prepack": "npm run build"
   },
   "peerDependencies": {
-    "react": ">=18"
+    "@nuxt/kit": ">=3.10",
+    "react": ">=18",
+    "vue": ">=3.3"
   },
   "peerDependenciesMeta": {
+    "@nuxt/kit": {
+      "optional": true
+    },
     "react": {
+      "optional": true
+    },
+    "vue": {
       "optional": true
     }
   },
