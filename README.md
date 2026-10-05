@@ -13,11 +13,11 @@ fixText('Il a dit : "C\'est l\'été !"', 'fr') // Il a dit : « C’est l’ét
 fixText('She said "it\'s fine" !', 'en')       // She said “it’s fine”!
 ```
 
-- **Tiny and fast.** No dependency, under 7 kB gzipped before minification, a few microseconds per string.
+- **Tiny and fast.** No dependency, under 9 kB gzipped before minification, a few microseconds per string.
 - **Works everywhere.** Server first (SSR, static builds, edge), browser too. Plain text, HTML, Portable Text, rehype / MDX, live DOM.
 - **Yours to tune.** Each language is a plain settings object. Change one character, turn a rule off, add a language.
 - **Accessible by design.** Only swaps characters for their Unicode equivalents: no markup, no invisible characters, nothing that changes what a screen reader announces.
-- **Safe on markup.** Tags, attributes, code, URLs and times are never touched. Running it twice changes nothing.
+- **Safe on markup.** Tags, attributes and code are never touched, the spacing rules leave URLs, times and emails alone, and running it twice changes nothing.
 
 ## Contents
 
@@ -96,7 +96,9 @@ fixHtml('<p>Il a dit : <em>"oui"</em> !</p>', 'fr')
 
 Rules see through inline tags (`a`, `em`, `strong`, `span`...) and comments, so `<em>oui</em> !` is fixed. Any other tag (`p`, `li`, `br`, `div`...) ends a run of text.
 
-Left untouched: tags, attributes, comments, and the content of `code`, `pre`, `kbd`, `samp`, `var`, `tt`, `script`, `style`, `textarea`, `svg` and `math`. Entities are understood (`&nbsp;!` is fixed) and `&lt;`, `&gt;`, `&amp;` are never decoded, so text can never turn into markup.
+Left untouched: tags, attributes, comments, and the content of `code`, `pre`, `kbd`, `samp`, `var`, `tt`, `script`, `style`, `textarea`, `svg` and `math`. Inline `code`, `kbd`, `samp`, `var` and `tt` count as a word: rules see around them (`"<code>npm</code>"` gets its guillemets) but never change them.
+
+The parser reads tags the way a browser does, stray quotes and unclosed `<p>` or `<li>` included. Entities are understood (`&nbsp;!` is fixed), text a rule leaves alone is written back exactly as it was, entities included, and no entity is ever decoded into a letter, a digit, `<`, `>`, `&` or `;`, so text can never turn into markup.
 
 The `lang` attributes of the document win over the `locale` argument, which is the fallback. Without either, the HTML comes back unchanged:
 
@@ -439,7 +441,7 @@ createTypo({ locales: { fr: { spaceBefore: { ';': NBSP, '!': NBSP, '?': NBSP }, 
 
 - ESM, with TypeScript types. `require('tiny-type-rules')` works in Node 20.19+ and 22.12+.
 - Node 20 or later, every modern browser, Deno, Bun, edge runtimes. No Node API is used.
-- Speed: about 8 µs per sentence, about 15 ms for 80 kB of HTML on a laptop.
+- Speed: 3 to 8 µs per sentence, about 20 ms for 80 kB of HTML on a laptop. Linear on any input, malformed HTML included.
 
 ## Versioning
 
