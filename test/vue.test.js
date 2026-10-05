@@ -1,57 +1,62 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
-import { createSSRApp, h } from 'vue'
+import { createSSRApp, h, ref } from 'vue'
 import { renderToString } from 'vue/server-renderer'
 
-import { createTypo } from '../src/index.ts'
-import { Typo, TypoPlugin, useTypo } from '../src/vue/index.ts'
+import { TTRPlugin, ttrTransform, useTTR } from '../src/vue/index.ts'
 
-const nb = (s) => s.replaceAll('~', ' ').replaceAll('^', ' ')
-const show = (s) => s.replaceAll(' ', '~').replaceAll(' ', '^').replace(/<!--\[-->|<!--\]-->/g, '')
+const show = (s) =>
+  s.replaceAll(' ', '~').replaceAll(' ', '^').replaceAll('&nbsp;', '~').replace(/<!--\[-->|<!--\]-->|<!---->/g, '')
 
-const MyLink = { template: '<a href="#"><slot /></a>' }
+const Card = { template: '<p class="card">Carte : oui !</p>' }
+const Wrap = { template: '<div class="wrap"><slot /></div>' }
+const Rich = { props: ['value'], setup: (props) => () => h('p', props.value[0].children[0].text) }
+const Link = { setup: (_, { slots }) => () => h('a', { href: '/' }, slots.default?.()) }
 
-async function render(template, plugin) {
-  const app = createSSRApp({ components: { Typo, MyLink }, template })
-  if (plugin) app.use(TypoPlugin, plugin)
-  return show(await renderToString(app))
+function app(component, options = { locale: 'fr' }) {
+  const instance = createSSRApp({ components: { Card, Wrap, Rich, Link }, ...component })
+  instance.config.compilerOptions.nodeTransforms = [ttrTransform]
+  return instance.use(TTRPlugin, options)
 }
+const render = async (template, data = {}, options) => show(await renderToString(app({ template, data: () => data }, options)))
 
-test('Typo fixes its slot across inline elements', async () => {
-  assert.equal(await render('<p><Typo locale="fr">Il a dit : "<em>oui</em>" !</Typo></p>'), '<p>Il a dit~: «~<em>oui</em>~»^!</p>')
-  assert.equal(await render(`<h1><Typo locale="en">It's {{ 'fine' }}...</Typo></h1>`), '<h1>It’s fine…</h1>')
+test('template text and interpolations are fixed while rendering', async () => {
+  assert.equal(await render('<h1>{{ title }}</h1>', { title: 'Il a dit : "Bonjour !"' }), '<h1>Il a dit~: «~Bonjour^!~»</h1>')
+  assert.equal(await render('<p>Bonjour {{ name }} !</p>', { name: 'Ana' }), '<p>Bonjour Ana^!</p>')
+  assert.equal(await render('<p>Le <em>titre</em> : <code>npm i</code> !</p>'), '<p>Le <em>titre</em>~: <code>npm i</code>^!</p>')
+  assert.equal(await render('<p>{{ 3 }} kg et {{ obj }} !</p>', { obj: { a: 1 } }), '<p>3 kg et {\n  &quot;a&quot;: 1\n}^!</p>')
 })
 
-test('Typo leaves code, other languages and opted-out elements alone', async () => {
-  assert.equal(await render('<Typo locale="fr">Lancez <code>a : "b"</code> !</Typo>'), 'Lancez <code>a : &quot;b&quot;</code>^!')
-  assert.equal(await render('<Typo locale="fr"><span lang="en">Yes !</span> Oui !</Typo>'), '<span lang="en">Yes !</span> Oui^!')
-  assert.equal(await render('<Typo locale="fr"><b data-ttr-prevent>Non !</b></Typo>'), '<b data-ttr-prevent>Non !</b>')
+test('child components, slots, v-html and Portable Text', async () => {
+  assert.equal(await render('<Card />'), '<p class="card">Carte~: oui^!</p>')
+  assert.equal(await render('<Wrap>Slot : oui !</Wrap>'), '<div class="wrap">Slot~: oui^!</div>')
+  assert.equal(await render('<p><Link>Accueil !</Link> ou pas ?</p>'), '<p><a href="/">Accueil^!</a> ou pas^?</p>')
+  assert.equal(await render('<div v-html="html" />', { html: '<p>Oui : non ?</p>' }), '<div><p>Oui~: non^?</p></div>')
+  const body = [{ _type: 'block', children: [{ _type: 'span', text: 'Portable : oui !' }] }]
+  assert.equal(await render('<Rich :value="body" />', { body }), '<p>Portable~: oui^!</p>')
+  assert.equal(body[0].children[0].text, 'Portable : oui !')
 })
 
-test('Typo fixes the slots of child components', async () => {
-  assert.equal(await render('<Typo locale="fr"><MyLink>Oui !</MyLink> ok ?</Typo>'), '<a href="#">Oui^!</a> ok^?')
+test('lang, data-ttr-prevent, data-ttr and code scope the text, across components', async () => {
+  assert.equal(await render(`<p lang="en">"Hi" , it's me !</p>`), '<p lang="en">“Hi”, it’s me!</p>')
+  assert.equal(await render('<div data-ttr-prevent><p>Non !</p><Card /></div>'), '<div data-ttr-prevent><p>Non !</p><p class="card" data-ttr-prevent>Carte : oui !</p></div>')
+  assert.equal(await render('<div data-ttr-prevent><p data-ttr>Oui !</p></div>'), '<div data-ttr-prevent><p data-ttr>Oui^!</p></div>')
+  assert.equal(await render('<div lang="en"><Card /></div>'), '<div lang="en"><p class="card" data-ttr-lang="en">Carte: oui!</p></div>')
+  assert.equal(await render('<pre>a : b !</pre><Card data-ttr-prevent />'), '<pre>a : b !</pre><p class="card" data-ttr-prevent>Carte : oui !</p>')
 })
 
-test('Typo renders fixed HTML', async () => {
-  assert.equal(await render(`<Typo locale="fr" as="section" class="x" html="<p>Oui !</p>" />`), '<section class="x"><p>Oui^!</p></section>')
+test('settings, the current language and useTTR', async () => {
+  const locale = ref('en')
+  assert.equal(await render('<p>Oui ! Non ?</p>', {}, { locale: 'fr', locales: { fr: { spaceBefore: { '?': '' } } } }), '<p>Oui^! Non?</p>')
+  assert.equal(await render('<p>Yes !</p>', {}, { getLocale: () => locale.value }), '<p>Yes!</p>')
+  assert.equal(await render('<p>Oui !</p>', {}, {}), '<p>Oui !</p>')
+  const Title = { setup: () => () => h('h1', useTTR().text('Oui !')) }
+  const instance = createSSRApp(Title).use(TTRPlugin, { locale: 'fr' })
+  assert.equal(show(await renderToString(instance)), '<h1>Oui^!</h1>')
 })
 
-test('TypoPlugin sets the default locale and settings for Typo and useTypo', async () => {
-  const plugin = { locale: 'fr', locales: { fr: { spaceBefore: { '?': '' } } } }
-  assert.equal(await render('<Typo>Oui ! Non ?</Typo>', plugin), 'Oui^! Non?')
-  const Title = { setup: () => () => h('h1', useTypo().text('Oui !')) }
-  const app = createSSRApp(Title).use(TypoPlugin, { locale: 'fr' })
-  assert.equal(show(await renderToString(app)), '<h1>Oui^!</h1>')
-  assert.equal(show(await renderToString(createSSRApp(Title))), '<h1>Oui !</h1>')
-})
-
-test('Typo accepts a custom fixer', async () => {
-  const app = createSSRApp({ components: { Typo }, setup: () => ({ typo: createTypo({ locale: 'en' }) }), template: '<Typo :typo="typo">Hi !</Typo>' })
-  assert.equal(show(await renderToString(app)), 'Hi!')
-})
-
-test('hydration matches the server HTML', async () => {
+test('hydration matches the server HTML, and updates stay fixed', async () => {
   const { Window } = await import('happy-dom')
   const window = new Window()
   const keys = ['window', 'document', 'Node', 'Element', 'SVGElement', 'HTMLElement', 'navigator']
@@ -61,16 +66,14 @@ test('hydration matches the server HTML', async () => {
   const warn = console.warn
   console.warn = (...args) => warnings.push(args.join(' '))
   try {
-    const template = '<p><Typo locale="fr">Il a dit : "<em>{{ word }}</em>" !</Typo> <MyLink>Oui !</MyLink></p>'
-    const component = { components: { Typo, MyLink }, data: () => ({ word: 'oui' }), template }
-    const html = await renderToString(createSSRApp(component))
+    const component = { template: '<div>Il a dit : "<em>{{ word }}</em>" ! <Card /><Link>Accueil {{ word }} !</Link></div>', data: () => ({ word: 'oui' }) }
+    const html = await renderToString(app(component))
     window.document.body.innerHTML = `<div id="app">${html}</div>`
-    const vm = createSSRApp(component).mount(window.document.querySelector('#app'))
+    const vm = app(component).mount(window.document.querySelector('#app'))
     assert.deepEqual(warnings.filter((w) => /mismatch/i.test(w)), [])
     vm.word = 'non'
     await new Promise((resolve) => setTimeout(resolve, 0))
-    const out = show(window.document.querySelector('#app').innerHTML.replaceAll('&nbsp;', '~'))
-    assert.equal(out, '<p>Il a dit~: «~<em>non</em>~»^! <a href="#">Oui !</a></p>')
+    assert.equal(show(window.document.querySelector('#app').innerHTML), '<div>Il a dit~: «~<em>non</em>~»^! <p class="card">Carte~: oui^!</p><a href="/">Accueil non^!</a></div>')
   } finally {
     console.warn = warn
     for (const k of keys) Object.defineProperty(globalThis, k, { value: saved[k], configurable: true, writable: true })
