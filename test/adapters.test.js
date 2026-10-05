@@ -98,3 +98,9 @@ test('rehype subpath exports the plugin as default', async () => {
   const { default: plugin } = await import('../src/rehype.ts')
   assert.equal(plugin, rehypeTinyTypeRules)
 })
+
+test('rehype plugin takes serializable settings', () => {
+  const tree = { type: 'root', children: [h('p', {}, t('Oui !'))] }
+  rehypeTinyTypeRules({ locale: 'fr', locales: { fr: { spaceBefore: { '!': '' } } } })(tree)
+  assert.equal(tree.children[0].children[0].value, 'Oui!')
+})

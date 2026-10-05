@@ -125,9 +125,9 @@ export const fixElement = typo.element
 
 /**
  * rehype plugin: `unified().use(rehypeTinyTypeRules, { locale: 'fr' })`.
- * Pass `typo` to use your own settings.
+ * Settings go in `locales` (serializable, for Turbopack) or in a ready-made `typo`.
  */
-export const rehypeTinyTypeRules =
-  (options: { locale?: string; typo?: Typo } = {}) =>
-  (tree: HastNode): void =>
-    (options.typo ?? typo).hast(tree, options.locale)
+export function rehypeTinyTypeRules(options: { locale?: string; locales?: TypoOptions['locales']; typo?: Typo } = {}) {
+  const fixer = options.typo ?? (options.locales ? createTypo({ locales: options.locales }) : typo)
+  return (tree: HastNode): void => fixer.hast(tree, options.locale)
+}
