@@ -14,7 +14,7 @@ fixText('She said "it\'s fine" !', 'en')       // She said “it’s fine”!
 ```
 
 - **Tiny and fast.** No dependency, under 9 kB gzipped before minification, a few microseconds per string.
-- **Works everywhere.** Server first (SSR, static builds, edge), browser too. Plain text, HTML, Portable Text, rehype / MDX, live DOM.
+- **Works everywhere.** Server first (SSR, static builds, edge), browser too. Plain text, HTML, Portable Text, rehype / MDX, live DOM, with ready-made components for Next.js, Nuxt, React and Vue.
 - **Yours to tune.** Each language is a plain settings object. Change one character, turn a rule off, add a language.
 - **Accessible by design.** Only swaps characters for their Unicode equivalents: no markup, no invisible characters, nothing that changes what a screen reader announces.
 - **Safe on markup.** Tags, attributes and code are never touched, the spacing rules leave URLs, times and emails alone, and running it twice changes nothing.
@@ -26,7 +26,7 @@ fixText('She said "it\'s fine" !', 'en')       // She said “it’s fine”!
 - [Usage](#usage): [text](#plain-text), [HTML](#html), [rich text](#rich-text-parts), [Portable Text](#portable-text-sanity), [rehype / MDX](#rehype-and-mdx), [DOM](#live-dom-browser)
 - [HTML attributes](#html-attributes)
 - [Settings](#settings)
-- [Frameworks](#frameworks): [Nuxt and Vue](#nuxt-and-vue), [Next.js and React](#nextjs-and-react), [Astro and static sites](#astro-and-static-sites)
+- [Frameworks](#frameworks): [Next.js](#nextjs), [Nuxt](#nuxt), [Vue](#vue), [any other site](#any-other-site)
 - [Accessibility](#accessibility)
 - [Fonts](#fonts)
 - [API](#api)
@@ -153,7 +153,17 @@ import { fixElement } from 'tiny-type-rules'
 fixElement(document.querySelector('main'))
 ```
 
-Rewrites text nodes in place, never adds or removes a node. The `lang` and `data-*` attributes of the element's ancestors apply, so `<html lang="fr">` is enough. In an app driven by React or Vue, prefer fixing the data before render (see [Frameworks](#frameworks)): the framework may write its own text back on the next update.
+Rewrites text nodes in place, never adds or removes a node. The `lang` and `data-*` attributes of the element's ancestors apply, so `<html lang="fr">` is enough.
+
+To keep a page fixed while its content changes, watch it instead. Each change fixes the paragraph it belongs to, batched, and the returned function stops watching:
+
+```js
+import { watchElement } from 'tiny-type-rules'
+
+const stop = watchElement(document.body)
+```
+
+In a React or Vue app, the [framework components](#frameworks) do this for you after hydration.
 
 ## HTML attributes
 
@@ -331,59 +341,82 @@ Built your language and checked it against a reference? A pull request is welcom
 
 ## Frameworks
 
-**Fix the data before it renders.** Every function is pure: the same input gives the same output on the server and in the browser, so calling it during render causes no hydration mismatch. Rewriting the HTML after the render (a Nitro `render:html` hook, a proxy, a CDN) does not work with hydrated apps: Vue writes its own text back on hydration, and React reports a mismatch.
+Two ways to use it, and they combine:
 
-### Nuxt and Vue
+- **`<Typo>`, at render.** Wrap the text that comes from your data. The HTML your server sends is already right, and since the same input always gives the same output, the browser renders the same text: no hydration mismatch.
+- **`auto` mode, in the browser.** One switch fixes the whole page once it is hydrated, then every text that changes or appears. Nothing to wrap, but the HTML your server sends is not fixed, and the text can shift a moment after load. Use it as a safety net, or for content you do not control.
 
-Make one fixer for the app. In Nuxt, files in `app/utils/` are auto-imported:
+`<Typo>` takes the same props in React and Vue:
 
-```ts
-// app/utils/typo.ts
-import { createTypo } from 'tiny-type-rules'
+| Prop                 | Description                                                                          |
+| -------------------- | ------------------------------------------------------------------------------------ |
+| children / slot      | The text to fix, inline elements and child components included.                      |
+| `locale`             | Language of the text. Default: the locale of your settings.                          |
+| `html`               | An HTML string to fix and render, in place of children.                              |
+| `as`                 | The element that receives `html`. Default: `div`.                                    |
+| `typo`               | A fixer from `createTypo`, for settings of its own.                                  |
 
-export const typo = createTypo()
-```
+`<Typo>` sees the text you write inside it, through inline elements and into the children you pass to other components (`<Link>Home !</Link>`). Text that a component renders on its own (`<Article />`) is out of its reach: wrap the text inside that component, or turn on `auto`. Inline `code`, an element with another `lang`, and `data-prevent-ttr` are left untouched.
 
-```vue
-<script setup lang="ts">
-const { locale } = useI18n() // or a constant
-const { data: page } = await useAsyncData('page', () => $fetch('/api/page'), {
-  transform: (page) => ({ ...page, body: typo.portableText(page.body, locale.value) }),
-})
-</script>
+### Next.js
 
-<template>
-  <h1>{{ typo.text(page.title, locale) }}</h1>
-  <PortableText :value="page.body" />
-  <div v-html="typo.html(page.html, locale)" />
-</template>
-```
-
-With a live data source (`useSanityQuery`), fix in a `computed` so updates stay reactive:
+Tested with Next.js 16 (App Router). Server Components cannot read React context, so the settings live in a small module that both sides import:
 
 ```ts
-const body = computed(() => typo.portableText(data.value?.body ?? [], 'fr'))
+// app/typo.ts
+import { defineTypo } from 'tiny-type-rules/react'
+
+export const settings = { locale: 'fr', locales: { fr: { widowSpace: '\u00A0' } } }
+export const { Typo, typo } = defineTypo(settings)
 ```
-
-### Next.js and React
-
-In a Server Component, or a Client Component alike:
 
 ```tsx
-import { fixHtml, fixPortableText, fixText } from 'tiny-type-rules'
-import { PortableText } from '@portabletext/react'
+// app/layout.tsx
+import { TypoProvider } from 'tiny-type-rules/react'
+import { settings } from './typo'
 
-export default async function Post({ params }) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="fr">
+      <body>
+        <TypoProvider {...settings} auto>
+          {children}
+        </TypoProvider>
+      </body>
+    </html>
+  )
+}
+```
+
+```tsx
+// app/blog/[slug]/page.tsx, a Server Component
+import { PortableText } from '@portabletext/react'
+import { Typo, typo } from '../../typo'
+
+export default async function Post({ params }: { params: Promise<{ slug: string }> }) {
   const post = await getPost((await params).slug)
   return (
-    <article lang="fr">
-      <h1>{fixText(post.title, 'fr')}</h1>
-      <PortableText value={fixPortableText(post.body, 'fr')} />
-      <div dangerouslySetInnerHTML={{ __html: fixHtml(post.html, 'fr') }} />
+    <article>
+      <h1><Typo>{post.title}</Typo></h1>
+      <Typo as="div" html={post.html} />
+      <PortableText value={typo.portableText(post.body)} />
     </article>
   )
 }
 ```
+
+In a Client Component, `useTypo()` returns the fixer of the provider:
+
+```tsx
+'use client'
+import { useTypo } from 'tiny-type-rules/react'
+
+export function Caption({ text }: { text: string }) {
+  return <figcaption>{useTypo().text(text)}</figcaption>
+}
+```
+
+Leave out `auto` to fix only what you wrap. With the Pages Router, put `TypoProvider` in `_app.tsx`; `Typo` works the same.
 
 MDX with `@next/mdx`. Turbopack needs plugins by name with serializable options, which `tiny-type-rules/rehype` supports:
 
@@ -396,11 +429,57 @@ const withMDX = createMDX({
 })
 ```
 
-The same plugin works with `react-markdown` (`rehypePlugins={[[rehypeTinyTypeRules, { locale: 'fr' }]]}`). Pages Router: fix in `getStaticProps` or `getServerSideProps`.
+The same plugin works with `react-markdown`: `rehypePlugins={[[rehypeTinyTypeRules, { locale: 'fr' }]]}`.
 
-### Astro and static sites
+### Nuxt
 
-Pages without hydration can be fixed after render. In an Astro middleware:
+Tested with Nuxt 4. The module reads its settings from `typo` in `nuxt.config`, and auto-imports `<Typo>` and `useTypo()`:
+
+```ts
+// nuxt.config.ts
+export default defineNuxtConfig({
+  modules: ['tiny-type-rules/nuxt'],
+  app: { head: { htmlAttrs: { lang: 'fr' } } },
+  typo: {
+    auto: true,
+    locales: { fr: { widowSpace: '\u00A0' } },
+  },
+})
+```
+
+`typo` takes `locale`, `locales` and `auto`, all optional. Without `locale`, the module uses `app.head.htmlAttrs.lang`.
+
+```vue
+<script setup lang="ts">
+const typo = useTypo()
+const { data: page } = await useAsyncData('page', () => $fetch('/api/page'))
+</script>
+
+<template>
+  <h1><Typo>{{ page.title }}</Typo></h1>
+  <Typo as="section" :html="page.html" />
+  <PortableText :value="typo.portableText(page.body)" />
+</template>
+```
+
+With a live data source (`useSanityQuery`), fix in a `computed` so updates stay reactive: `computed(() => typo.portableText(data.value?.body ?? []))`. A site in several languages passes the current one: `<Typo :locale="locale">`.
+
+### Vue
+
+Without Nuxt, install the plugin and register the component:
+
+```ts
+import { createApp } from 'vue'
+import { Typo, TypoPlugin } from 'tiny-type-rules/vue'
+
+createApp(App).use(TypoPlugin, { locale: 'fr', auto: true }).component('Typo', Typo).mount('#app')
+```
+
+### Any other site
+
+In the browser, `watchElement(document.body)` fixes the page and keeps it fixed, with the `lang` attributes of the page.
+
+Pages without hydration can also be fixed on the server, after render. In an Astro middleware:
 
 ```ts
 // src/middleware.ts
@@ -415,7 +494,7 @@ export const onRequest = async (context, next) => {
 }
 ```
 
-The same goes for any static site generator, a build script, or an email template: pass the final HTML to `fixHtml` and let the `lang` attributes pick the rules.
+The same goes for a static site generator, a build script or an email template: pass the final HTML to `fixHtml`. Do not do this for a hydrated app (a Nitro `render:html` hook, a proxy, a CDN rewrite): Vue writes its own text back on hydration, and React reports a mismatch.
 
 ## Accessibility
 
@@ -444,16 +523,25 @@ createTypo({ locales: { fr: { spaceBefore: { ';': NBSP, '!': NBSP, '?': NBSP } }
 | `fixHtml(html, locale?)`                        | Fixes the text of an HTML string.                                   |
 | `fixPortableText(blocks, locale)`               | Fixes Portable Text blocks, returns new ones.                       |
 | `fixElement(element, locale?)`                  | Fixes a live DOM element in place.                                  |
+| `watchElement(element, locale?)`                | Fixes a live DOM element, then on every change. Returns `stop()`.   |
 | `rehypeTinyTypeRules(options?)`                 | rehype plugin, also the default export of `tiny-type-rules/rehype`. |
-| `createTypo({ locales })`                       | A fixer with your settings: `text`, `parts`, `html`, `portableText`, `element`, `hast`. |
+| `createTypo({ locale, locales })`               | A fixer with your settings and default locale: `text`, `parts`, `html`, `portableText`, `element`, `watch`, `hast`. |
 | `fr`, `en`                                      | Built-in settings.                                                  |
 | `NBSP`, `NNBSP`, `FIGURE_SPACE`, `THIN_SPACE`, `HAIR_SPACE`, `UNITS` | Characters and the default unit list.    |
 | `LocaleConfig`, `TypoOptions`, `Typo`           | TypeScript types.                                                   |
+
+| Entry point               | Exports                                                                              |
+| ------------------------- | ------------------------------------------------------------------------------------ |
+| `tiny-type-rules/react`   | `Typo`, `defineTypo(settings)`, `TypoProvider` (`auto`, `locale`, `locales`), `useTypo()` |
+| `tiny-type-rules/vue`     | `Typo`, `TypoPlugin` (`auto`, `locale`, `locales`), `useTypo()`, `TYPO_KEY`           |
+| `tiny-type-rules/nuxt`    | The Nuxt module, configured under `typo` in `nuxt.config`                             |
+| `tiny-type-rules/rehype`  | The rehype plugin, as default export                                                 |
 
 ## Compatibility
 
 - ESM, with TypeScript types. `require('tiny-type-rules')` works in Node 20.19+ and 22.12+.
 - Node 20 or later, every modern browser, Deno, Bun, edge runtimes. No Node API is used.
+- The framework entry points need what your app already has: React 18+, Vue 3.3+, Nuxt 3.10+. Tested with Next.js 16 and Nuxt 4, server rendering and hydration included.
 - Speed: 3 to 8 µs per sentence, about 20 ms for 80 kB of HTML on a laptop. Linear on any input, malformed HTML included.
 
 ## Versioning
