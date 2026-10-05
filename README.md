@@ -548,6 +548,10 @@ createTypo({ locales: { fr: { spaceBefore: { ';': NBSP, '!': NBSP, '?': NBSP } }
 
 [Semantic Versioning](https://semver.org). A changed output for the same input is part of the contract: a fix to a wrong output is a patch, a new rule, setting or language is a minor, and anything that breaks your code or your settings is a major. See the [changelog](CHANGELOG.md).
 
+## Roadmap
+
+What comes next, from Shopify themes to more languages: see the [roadmap](ROADMAP.md).
+
 ## Contributing
 
 Issues and pull requests are welcome. Read [CONTRIBUTING](CONTRIBUTING.md) and the [code of conduct](CODE_OF_CONDUCT.md). Security issues: [SECURITY](SECURITY.md).
