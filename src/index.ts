@@ -71,7 +71,10 @@ export function createTypo(options: TypoOptions = {}): Typo {
   for (const [tag, config] of custom) configs.set(tag, merge(configs.get(tag) ?? configs.get(language(tag)), config))
 
   const compiled = new Map([...configs].map(([tag, config]) => [tag, compile(config)]))
-  const rules = (locale: string) => compiled.get(locale.toLowerCase().replaceAll('_', '-')) ?? compiled.get(language(locale))
+  const rules = (locale: string) =>
+    typeof locale !== 'string'
+      ? undefined
+      : (compiled.get(locale.toLowerCase().replaceAll('_', '-')) ?? compiled.get(language(locale)))
 
   const fix = (parts: readonly string[], locale: string) => {
     const apply = rules(locale)
@@ -85,11 +88,11 @@ export function createTypo(options: TypoOptions = {}): Typo {
   }
 
   return {
-    text: (text, locale) => fix([text], locale)?.[0] ?? text,
+    text: (text, locale) => (typeof text === 'string' && fix([text], locale)?.[0]) || text,
     parts: (parts, locale) => (parts.length && fix(parts, locale)) || [...parts],
-    html: (html, locale) => fixHtmlWith(fix, html, locale),
+    html: (html, locale) => (typeof html === 'string' ? fixHtmlWith(fix, html, locale) : html),
     portableText: (blocks, locale) =>
-      blocks.map((block) => {
+      !Array.isArray(blocks) ? (blocks as never) : blocks.map((block) => {
         const { _type, children } = (block ?? {}) as { _type?: unknown; children?: unknown }
         if (_type !== 'block' || !Array.isArray(children)) return block
         const fixed = new Map<Span, string>()

@@ -54,7 +54,7 @@ export class Run {
     for (const m of text.matchAll(re)) {
       const start = m.index
       const end = start + m[0].length
-      const r = typeof rep === 'string' ? rep.replace(/\$(\d)/g, (_, n) => m[+n] ?? '') : rep(m)
+      const r = typeof rep === 'string' ? rep : rep(m)
       out += text.slice(last, start)
       const at = out.length
       while (i < marks.length && marks[i]! <= start) marks[i]! += at - start, i++
@@ -120,7 +120,7 @@ export function compile(c: LocaleConfig): (run: Run) => void {
   for (const punct of puncts) {
     const space = c.spaceBefore![punct]
     if (!isSet(space)) continue
-    add(new RegExp(`${before}${S}*((?:${esc(punct)})+)${AFTER_PUNCT}`, 'gu'), space + '$1')
+    add(new RegExp(`${before}${S}*((?:${esc(punct)})+)${AFTER_PUNCT}`, 'gu'), (m) => space + m[1])
   }
   if (isSet(c.thousandsSeparator)) {
     add(new RegExp(`(?<=(?<![\\d.,])\\d{1,3}(?:${S}\\d{3})*)${S}(?=\\d{3}(?!\\d))`, 'gu'), c.thousandsSeparator)

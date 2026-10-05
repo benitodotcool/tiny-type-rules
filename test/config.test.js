@@ -79,3 +79,22 @@ test('non-breaking spaces of every width survive widows and a second pass', () =
   assert.equal(once, nb('Il finit par un~cri !'))
   assert.equal(typo.text(once, 'fr'), once)
 })
+
+test('setting values are literal strings', () => {
+  const typo = createTypo({ locales: { fr: { replacements: { USD: '$1 $&' }, spaceBefore: { '!': '$1' } } } })
+  assert.equal(typo.text('10 USD !', 'fr'), nb('10 $1~$&$1!'))
+})
+
+test('missing inputs come back as they are', async () => {
+  const { fixText, fixHtml, fixParts, fixPortableText } = await import('../src/index.ts')
+  for (const value of [undefined, null, 42]) {
+    assert.equal(fixText(value, 'fr'), value)
+    assert.equal(fixHtml(value, 'fr'), value)
+    assert.equal(fixPortableText(value, 'fr'), value)
+  }
+  assert.equal(fixText('Oui !', undefined), 'Oui !')
+  assert.equal(fixText('Oui !', null), 'Oui !')
+  assert.equal(fixHtml('<p>Oui !</p>', null), '<p>Oui !</p>')
+  assert.deepEqual(fixParts(['Oui !'], undefined), ['Oui !'])
+  assert.equal(fixText('', 'fr'), '')
+})
