@@ -55,7 +55,7 @@ type Props = Record<string, unknown> | null
 const noop = () => {}
 // Code, another language or an opted-out element: the rules see a word there, never inside.
 const opaque = (type: string, props: Props) =>
-  SKIP.has(type) || props?.['data-prevent-ttr'] != null || props?.lang != null || props?.['data-ttr-lang'] != null
+  SKIP.has(type) || props?.['data-ttr-prevent'] != null || props?.lang != null || props?.['data-ttr-lang'] != null
 
 function collect(nodes: VNodeArrayChildren, out: Target[], fix: (nodes: VNode[]) => void): void {
   nodes.forEach((node, i) => {

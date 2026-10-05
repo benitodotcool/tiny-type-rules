@@ -41,7 +41,18 @@
     },
     "./react": {
       "types": "./dist/react/index.d.ts",
+      "react-server": "./dist/react/index.server.js",
       "default": "./dist/react/index.js"
+    },
+    "./react/jsx-runtime": {
+      "types": "./dist/react/jsx-runtime.d.ts",
+      "react-server": "./dist/react/jsx-runtime.server.js",
+      "default": "./dist/react/jsx-runtime.js"
+    },
+    "./react/jsx-dev-runtime": {
+      "types": "./dist/react/jsx-dev-runtime.d.ts",
+      "react-server": "./dist/react/jsx-dev-runtime.server.js",
+      "default": "./dist/react/jsx-dev-runtime.js"
     },
     "./vue": {
       "types": "./dist/vue/index.d.ts",

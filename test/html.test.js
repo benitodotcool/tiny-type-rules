@@ -30,11 +30,11 @@ test('code-like elements are left untouched', () => {
   assert.equal(fr('<svg><text>Oui !</text></svg>'), '<svg><text>Oui !</text></svg>')
 })
 
-test('data-prevent-ttr opts a subtree out, data-ttr opts back in', () => {
-  assert.equal(fr('<p data-prevent-ttr>Oui ! <b>Non !</b></p>'), '<p data-prevent-ttr>Oui ! <b>Non !</b></p>')
+test('data-ttr-prevent opts a subtree out, data-ttr opts back in', () => {
+  assert.equal(fr('<p data-ttr-prevent>Oui ! <b>Non !</b></p>'), '<p data-ttr-prevent>Oui ! <b>Non !</b></p>')
   assert.equal(
-    fr('<div data-prevent-ttr>Oui ! <p data-ttr>Non !</p> Oui !</div>'),
-    nb('<div data-prevent-ttr>Oui ! <p data-ttr>Non^!</p> Oui !</div>'),
+    fr('<div data-ttr-prevent>Oui ! <p data-ttr>Non !</p> Oui !</div>'),
+    nb('<div data-ttr-prevent>Oui ! <p data-ttr>Non^!</p> Oui !</div>'),
   )
   assert.equal(fr('<pre data-ttr>Oui !</pre>'), nb('<pre data-ttr>Oui^!</pre>'))
 })
@@ -79,10 +79,10 @@ test('idempotent', () => {
 test('markup comes out exactly as it went in', () => {
   const tags = (html) => html.match(/<[^>]*>?/g) ?? []
   const docs = [
-    '<ul><li data-prevent-ttr>Item !<ul><li>Sous !</li><li>Deux !</ul> fin !</li><li>Oui !</li></ul>',
+    '<ul><li data-ttr-prevent>Item !<ul><li>Sous !</li><li>Deux !</ul> fin !</li><li>Oui !</li></ul>',
     '<dl><dt lang="en">T !<dd>D !<dt>T2 !</dl><table><tr><td lang="en">A !<td>B !<tr><td>C !</table>',
     '<p lang="en">a <em>b</em> !<p>c !<div>d !</div><select><option lang="en">x !<option>y !</select>',
-    '<p data-prevent-ttr>Non <a href="#">x</a> : "non" !</p><template><p>t !</p></template><!-->x !<!-- y -->',
+    '<p data-ttr-prevent>Non <a href="#">x</a> : "non" !</p><template><p>t !</p></template><!-->x !<!-- y -->',
     '<div lang="en"><div/>Yes !</div>Yes !</div><svg><path d="M0 0"/><text>a !</text></svg><p>&#60;b&#62; &amp; &lt;i&gt; !</p>',
   ]
   for (const html of docs) for (const locale of ['fr', 'en']) assert.deepEqual(tags(fixHtml(html, locale)), tags(html), html)

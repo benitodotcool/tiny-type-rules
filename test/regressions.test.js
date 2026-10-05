@@ -93,7 +93,7 @@ test('scopes close on implied end tags', () => {
 
 test('attribute values are not read as attributes', () => {
   assert.equal(fixHtml('<p title="x lang=en y">Oui !</p>', 'fr'), nb('<p title="x lang=en y">Oui^!</p>'))
-  assert.equal(fixHtml('<p data-x="a data-prevent-ttr b">Oui !</p>', 'fr'), nb('<p data-x="a data-prevent-ttr b">Oui^!</p>'))
+  assert.equal(fixHtml('<p data-x="a data-ttr-prevent b">Oui !</p>', 'fr'), nb('<p data-x="a data-ttr-prevent b">Oui^!</p>'))
   assert.equal(fixHtml('<p lang="en"data-x>Yes !</p>', 'fr'), '<p lang="en"data-x>Yes!</p>')
 })
 
@@ -143,7 +143,7 @@ test('malformed HTML stays linear', () => {
 })
 
 test('inline end tags never close a p or li scope', () => {
-  const prevented = '<p data-prevent-ttr>Non <em>x</em> : "non" !</p>'
+  const prevented = '<p data-ttr-prevent>Non <em>x</em> : "non" !</p>'
   assert.equal(fixHtml(prevented, 'fr'), prevented)
   assert.equal(
     fixHtml('<div lang="fr"><p lang="en"><a href="#">Hi</a> "there" : ok !</p></div>'),
@@ -153,8 +153,8 @@ test('inline end tags never close a p or li scope', () => {
 })
 
 test('nested lists and other implied end tags', () => {
-  const html = '<ul><li data-prevent-ttr>Item !<ul><li>Sous !</li><li>Deux !</ul> fin !</li><li>Oui !</li></ul>'
-  assert.equal(fixHtml(html, 'fr'), nb('<ul><li data-prevent-ttr>Item !<ul><li>Sous !</li><li>Deux !</ul> fin !</li><li>Oui^!</li></ul>'))
+  const html = '<ul><li data-ttr-prevent>Item !<ul><li>Sous !</li><li>Deux !</ul> fin !</li><li>Oui !</li></ul>'
+  assert.equal(fixHtml(html, 'fr'), nb('<ul><li data-ttr-prevent>Item !<ul><li>Sous !</li><li>Deux !</ul> fin !</li><li>Oui^!</li></ul>'))
   assert.equal(fixHtml('<dl><dt lang="en">Term !<dd>Déf !</dl>', 'fr'), nb('<dl><dt lang="en">Term!<dd>Déf^!</dl>'))
   assert.equal(fixHtml('<table><tr><td lang="en">A !<td>B !</table>', 'fr'), nb('<table><tr><td lang="en">A!<td>B^!</table>'))
 })

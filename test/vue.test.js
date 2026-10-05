@@ -26,7 +26,7 @@ test('Typo fixes its slot across inline elements', async () => {
 test('Typo leaves code, other languages and opted-out elements alone', async () => {
   assert.equal(await render('<Typo locale="fr">Lancez <code>a : "b"</code> !</Typo>'), 'Lancez <code>a : &quot;b&quot;</code>^!')
   assert.equal(await render('<Typo locale="fr"><span lang="en">Yes !</span> Oui !</Typo>'), '<span lang="en">Yes !</span> Oui^!')
-  assert.equal(await render('<Typo locale="fr"><b data-prevent-ttr>Non !</b></Typo>'), '<b data-prevent-ttr>Non !</b>')
+  assert.equal(await render('<Typo locale="fr"><b data-ttr-prevent>Non !</b></Typo>'), '<b data-ttr-prevent>Non !</b>')
 })
 
 test('Typo fixes the slots of child components', async () => {

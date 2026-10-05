@@ -1,2 +1,2 @@
-export { defineTypo, Typo, type TypoProps } from './typo.ts'
-export { TypoProvider, useTypo, type TypoProviderProps } from './provider.ts'
+export { TTRClientProvider as TTRProvider, useTTR, type TTRProviderProps } from './context.ts'
+export type { Settings as TTRSettings } from './shared.ts'

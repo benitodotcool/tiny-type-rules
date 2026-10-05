@@ -41,11 +41,11 @@ test('rehype plugin', () => {
     type: 'root',
     children: [
       h('p', {}, t('Bonjour '), h('em', {}, t('à tous')), t(' !')),
-      h('p', { dataPreventTtr: true }, t('Non !')),
+      h('p', { dataTtrPrevent: true }, t('Non !')),
       h('p', { lang: 'en' }, t("It's me !")),
       h('pre', {}, h('code', {}, t('a : b'))),
       { type: 'comment', value: 'x' },
-      { type: 'mdxJsxFlowElement', name: 'Note', attributes: [{ type: 'mdxJsxAttribute', name: 'data-prevent-ttr', value: null }], children: [t('Non !')] },
+      { type: 'mdxJsxFlowElement', name: 'Note', attributes: [{ type: 'mdxJsxAttribute', name: 'data-ttr-prevent', value: null }], children: [t('Non !')] },
     ],
   }
   rehypeTinyTypeRules({ locale: 'fr' })(tree)
@@ -77,14 +77,14 @@ test('fixElement works in place and respects ancestors', () => {
   const code = tx('a : b')
   const prevented = tx('Non !')
   const english = tx("It's !")
-  const article = el('article', {}, el('p', {}, a, comment(), el('strong', {}, b)), el('code', {}, code), el('p', { 'data-prevent-ttr': '' }, prevented), el('p', { lang: 'en' }, english))
+  const article = el('article', {}, el('p', {}, a, comment(), el('strong', {}, b)), el('code', {}, code), el('p', { 'data-ttr-prevent': '' }, prevented), el('p', { lang: 'en' }, english))
   const html = el('html', { lang: 'fr' }, el('body', {}, article))
   fixElement(article)
   assert.deepEqual([a, b, code, prevented, english].map((n) => n.nodeValue), ['Bonjour', '^!', 'a : b', 'Non !', 'It’s!'].map(nb))
   assert.ok(html)
 
   const inside = tx('Oui !')
-  el('div', { 'data-prevent-ttr': '' }, el('p', {}, inside))
+  el('div', { 'data-ttr-prevent': '' }, el('p', {}, inside))
   fixElement(inside.parentElement, 'fr')
   assert.equal(inside.nodeValue, 'Oui !')
 

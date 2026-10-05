@@ -23,7 +23,7 @@ export type FixParts = (
 /** The scope an element opens, or undefined when it shares its parent's. */
 export function enter(name: string, attr: (name: string) => string | null, top: Scope): Scope | undefined {
   const lang = attr('data-ttr-lang') ?? attr('lang')
-  const prevent = attr('data-prevent-ttr') !== null
+  const prevent = attr('data-ttr-prevent') !== null
   const enable = attr('data-ttr') !== null
   if (lang === null && !prevent && !enable && !SKIP.has(name)) return undefined
   const skip = enable ? false : prevent || top.skip || SKIP.has(name)

@@ -143,7 +143,7 @@ import rehypeTinyTypeRules from 'tiny-type-rules/rehype'
 unified().use(remarkParse).use(remarkRehype).use(rehypeTinyTypeRules, { locale: 'fr' }).use(rehypeStringify)
 ```
 
-Same rules and [attributes](#html-attributes) as `fixHtml`, MDX components included (`<Note data-prevent-ttr>`). Options: `locale`, `locales` ([settings](#settings), serializable) or `typo` (an instance from `createTypo`).
+Same rules and [attributes](#html-attributes) as `fixHtml`, MDX components included (`<Note data-ttr-prevent>`). Options: `locale`, `locales` ([settings](#settings), serializable) or `typo` (an instance from `createTypo`).
 
 ### Live DOM (browser)
 
@@ -171,7 +171,7 @@ A few attributes scope the rules from your markup. They work in `fixHtml`, `fixE
 
 | Attribute              | Effect                                                                     |
 | ---------------------- | -------------------------------------------------------------------------- |
-| `data-prevent-ttr`     | Leaves the element and its descendants untouched.                         |
+| `data-ttr-prevent`     | Leaves the element and its descendants untouched.                         |
 | `data-ttr`             | Turns the rules back on inside a prevented element or a `pre` / `code`.   |
 | `data-ttr-lang="en"`   | Rules of this language for the element, without changing its `lang`.     |
 | `lang="fr"`            | Rules of this language for the element. Unsupported language: untouched. |
@@ -179,8 +179,8 @@ A few attributes scope the rules from your markup. They work in `fixHtml`, `fixE
 ```html
 <article lang="fr">
   <p>Corrigé !</p>
-  <p data-prevent-ttr>Laissé tel quel !</p>
-  <div data-prevent-ttr>
+  <p data-ttr-prevent>Laissé tel quel !</p>
+  <div data-ttr-prevent>
     <p>Pas corrigé !</p>
     <p data-ttr>Corrigé à nouveau !</p>
   </div>
@@ -356,7 +356,7 @@ Two ways to use it, and they combine:
 | `as`                 | The element that receives `html`. Default: `div`.                                    |
 | `typo`               | A fixer from `createTypo`, for settings of its own.                                  |
 
-`<Typo>` sees the text you write inside it, through inline elements and into the children you pass to other components (`<Link>Home !</Link>`). Text that a component renders on its own (`<Article />`) is out of its reach: wrap the text inside that component, or turn on `auto`. Inline `code`, an element with another `lang`, and `data-prevent-ttr` are left untouched.
+`<Typo>` sees the text you write inside it, through inline elements and into the children you pass to other components (`<Link>Home !</Link>`). Text that a component renders on its own (`<Article />`) is out of its reach: wrap the text inside that component, or turn on `auto`. Inline `code`, an element with another `lang`, and `data-ttr-prevent` are left untouched.
 
 ### Next.js
 
