@@ -107,6 +107,7 @@ const INTERPOLATION = 5
 const ATTRIBUTE = 6
 const DIRECTIVE = 7
 const COMPONENT = 1
+const ELEMENT_TAG = 0
 
 type Node = {
   type: number
@@ -124,7 +125,9 @@ function compiledScope(node: Node, parent: Compiled): Compiled {
   const attr = (name: string) => node.props?.find((p) => p.type === ATTRIBUTE && p.name === name)
   if (attr('data-ttr')) return { skip: false, locale: attr('lang')?.value?.content ?? parent.locale, explicit: true }
   const lang = (attr('data-ttr-lang') ?? attr('lang'))?.value?.content
-  const skip = parent.skip || !!attr('data-ttr-prevent') || (node.tagType !== COMPONENT && SKIP.has(node.tag ?? ''))
+  // A Vue `<template>` (v-if, v-for, slots) only groups nodes: it is no HTML template element.
+  const tag = node.tagType === ELEMENT_TAG ? (node.tag ?? '') : ''
+  const skip = parent.skip || !!attr('data-ttr-prevent') || SKIP.has(tag)
   return lang ? { skip, locale: lang, explicit: true } : { ...parent, skip }
 }
 

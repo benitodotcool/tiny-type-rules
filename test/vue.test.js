@@ -25,6 +25,7 @@ test('template text and interpolations are fixed while rendering', async () => {
   assert.equal(await render('<h1>{{ title }}</h1>', { title: 'Il a dit : "Bonjour !"' }), '<h1>Il a dit~: «~Bonjour^!~»</h1>')
   assert.equal(await render('<p>Bonjour {{ name }} !</p>', { name: 'Ana' }), '<p>Bonjour Ana^!</p>')
   assert.equal(await render('<p>Le <em>titre</em> : <code>npm i</code> !</p>'), '<p>Le <em>titre</em>~: <code>npm i</code>^!</p>')
+  assert.equal(await render('<div><template v-if="true"><p>Oui !</p><Card /></template></div>'), '<div><p>Oui^!</p><p class="card">Carte~: oui^!</p></div>')
   assert.equal(await render('<p>{{ 3 }} kg et {{ obj }} !</p>', { obj: { a: 1 } }), '<p>3 kg et {\n  &quot;a&quot;: 1\n}^!</p>')
 })
 
